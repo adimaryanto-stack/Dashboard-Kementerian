@@ -75,6 +75,9 @@ export default function ProvinsiPage() {
           persentase_penyerapan: nominal > 0 ? (realisasi / nominal) * 100 : 0,
         };
       }));
+      import('@/lib/data').then(({ updateAlokasiProvinsi }) => {
+        updateAlokasiProvinsi(editingCell.id, editingCell.field === 'nominal' ? 'nominal_alokasi' : 'realisasi_total', parsed);
+      });
     }
     setEditingCell(null);
   };

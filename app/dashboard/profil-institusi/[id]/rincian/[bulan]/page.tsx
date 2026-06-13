@@ -17,21 +17,32 @@ export default function RincianPengeluaranPage() {
   const nomorBulan = parseInt(params.bulan as string, 10);
   const { activeTahun } = useAppStore();
 
-  const rincianData = useMemo(
-    () => getRincianPengeluaranBulanan(institusiId, nomorBulan, activeTahun),
-    [institusiId, nomorBulan, activeTahun]
-  );
-
-  // Editable state
+  // State for async data
   const [items, setItems] = useState<RincianPengeluaranItem[]>([]);
+  const [rincianData, setRincianData] = useState<any>(null);
   const [editingCell, setEditingCell] = useState<{ id: string; field: 'harga_satuan' | 'qty' } | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (rincianData) {
-      setItems(rincianData.items);
-    }
-  }, [rincianData]);
+    import('@/lib/data').then(({ fetchRincianPengeluaranBulanan }) => {
+      fetchRincianPengeluaranBulanan(institusiId, nomorBulan, activeTahun).then((data) => {
+        setRincianData(data);
+        if (data) {
+          setItems(data.items);
+        }
+        setLoading(false);
+      });
+    });
+  }, [institusiId, nomorBulan, activeTahun]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="animate-spin rounded-full h-8 w-8 border-4 border-indigo-600 border-t-transparent" />
+      </div>
+    );
+  }
 
   if (!rincianData) {
     return (

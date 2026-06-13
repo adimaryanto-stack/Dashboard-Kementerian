@@ -75,6 +75,9 @@ export default function KabupatenKotaPage() {
           persentase_penyerapan: nominal > 0 ? Math.round((realisasi / nominal) * 1000) / 10 : 0,
         };
       }));
+      import('@/lib/data').then(({ updateAlokasiKabupatenKota }) => {
+        updateAlokasiKabupatenKota(editingCell.id, editingCell.field === 'nominal' ? 'nominal_alokasi' : 'realisasi_total', parsed);
+      });
     }
     setEditingCell(null);
   };

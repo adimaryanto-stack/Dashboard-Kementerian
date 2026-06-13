@@ -8,6 +8,10 @@ interface AppState {
   sidebarOpen: boolean;
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
+  dataVersion: number;
+  incrementVersion: () => void;
+  loading: boolean;
+  setLoading: (loading: boolean) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -16,4 +20,8 @@ export const useAppStore = create<AppState>((set) => ({
   sidebarOpen: true,
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
+  dataVersion: 0,
+  incrementVersion: () => set((s) => ({ dataVersion: s.dataVersion + 1 })),
+  loading: false,
+  setLoading: (loading) => set({ loading }),
 }));
