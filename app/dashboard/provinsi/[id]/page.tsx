@@ -8,6 +8,7 @@ import PctBadge from '@/components/ui/PctBadge';
 import { useAppStore } from '@/lib/store';
 import { alokasiProvinsiData, getKabkotaByProvinsi, getJenjangBreakdownByProvinsi, tahunAnggaranData } from '@/lib/data';
 import { fmtRupiah, fmtTriliun } from '@/lib/utils/formatters';
+import { exportToExcel, getPctColorHex } from '@/lib/utils/excelExport';
 import { AlokasiProvinsi, AlokasiKabupatenKota, JenjangBreakdownProvinsi } from '@/types';
 import { ArrowLeft, Banknote, Download, Plus, RefreshCw, Sparkles } from 'lucide-react';
 
@@ -130,6 +131,107 @@ export default function ProvinsiDetailPage() {
     setEditingCell(null);
   };
 
+  const handleExport = async () => {
+    const summaryHeaders = [
+      'Nomor', 'Tahun Anggaran', 'Nominal (Rp)', 'Realisasi (Rp)', 'Nominal Selisih (Rp)', 'Persentase penyerapan (%)'
+    ];
+    const summaryColorHex = getPctColorHex(totals.persentase);
+    const summaryRows = [
+      [
+        { value: 1, align: 'center' },
+        { value: activeTahun, align: 'center' },
+        { value: totals.nominal, isCurrency: true },
+        { value: totals.realisasi, isCurrency: true },
+        { value: { formula: 'C2-D2' }, isCurrency: true, textColor: '991B1B' },
+        { 
+          value: { formula: 'IF(C2>0, D2/C2, 0)' }, 
+          isPercent: true, 
+          bgColor: summaryColorHex.bg, 
+          textColor: summaryColorHex.text,
+          bold: true,
+          align: 'center'
+        }
+      ]
+    ];
+
+    const jenjangHeaders = [
+      'Nomor', 'Jenjang Pendidikan', 'Jumlah Sekolah', 'Nominal Keseluruhan (Rp)', 'Porsi Anggaran (%)'
+    ];
+    const jenjangRows = jenjangBreakdown.map((row, idx) => {
+      const rowNum = idx + 2;
+      return [
+        { value: row.nomor, align: 'center' },
+        { value: row.jenjang },
+        { value: row.jumlah_sekolah, align: 'center' },
+        { value: row.nominal_keseluruhan, isCurrency: true },
+        { value: { formula: `D${rowNum}/SUM(D$2:D$6)` }, isPercent: true, align: 'center', bold: true }
+      ];
+    });
+
+    const kabkotaHeaders = [
+      'Nomor', 'Nama Kabupaten/Kota', 'Nominal Anggaran (Rp)', 'Realisasi (Rp)', 'Nominal Selisih (Rp)', 'Persentase penyerapan (%)'
+    ];
+    const kabkotaRows = kabkotaList.map((row, idx) => {
+      const rowNum = idx + 2;
+      const colorHex = getPctColorHex(row.persentase_penyerapan);
+      return [
+        { value: idx + 1, align: 'center' },
+        { value: row.kabupaten_kota.nama_kabupaten_kota },
+        { value: row.nominal_alokasi, isCurrency: true },
+        { value: row.realisasi_total, isCurrency: true },
+        { value: { formula: `C${rowNum}-D${rowNum}` }, isCurrency: true, textColor: '991B1B' },
+        { 
+          value: { formula: `IF(C${rowNum}>0, D${rowNum}/C${rowNum}, 0)` }, 
+          isPercent: true, 
+          bgColor: colorHex.bg, 
+          textColor: colorHex.text,
+          bold: true,
+          align: 'center'
+        }
+      ];
+    });
+
+    const totalRowIndex = kabkotaList.length + 2;
+    const totalColorHex = getPctColorHex(totals.persentase);
+    const totalsRow = [
+      { value: '', bold: true },
+      { value: 'TOTAL / REALISASI', bold: true },
+      { value: { formula: `SUM(C2:C${totalRowIndex-1})` }, isCurrency: true, bold: true },
+      { value: { formula: `SUM(D2:D${totalRowIndex-1})` }, isCurrency: true, bold: true },
+      { value: { formula: `C${totalRowIndex}-D${totalRowIndex}` }, isCurrency: true, bold: true, textColor: '991B1B' },
+      { 
+        value: { formula: `IF(C${totalRowIndex}>0, D${totalRowIndex}/C${totalRowIndex}, 0)` }, 
+        isPercent: true, 
+        bold: true, 
+        bgColor: totalColorHex.bg,
+        textColor: totalColorHex.text,
+        align: 'center'
+      }
+    ];
+
+    await exportToExcel(`Laporan_Provinsi_${provData.provinsi.nama_provinsi}_${activeTahun}.xlsx`, [
+      {
+        name: 'Summary',
+        headers: summaryHeaders,
+        rows: summaryRows,
+        columnWidths: [8, 18, 22, 22, 22, 25]
+      },
+      {
+        name: 'Porsi Jenjang',
+        headers: jenjangHeaders,
+        rows: jenjangRows,
+        columnWidths: [8, 28, 16, 25, 20]
+      },
+      {
+        name: 'Dinas Kabupaten-Kota',
+        headers: kabkotaHeaders,
+        rows: [...kabkotaRows, totalsRow],
+        columnWidths: [8, 28, 22, 22, 22, 25]
+      }
+    ]);
+  };
+
+
   const renderEditableCell = (row: AlokasiKabupatenKota, field: 'nominal_alokasi' | 'realisasi_total') => {
     const value = row[field];
     const isEditing = editingCell?.id === row.id && editingCell?.field === field;
@@ -182,9 +284,7 @@ export default function ProvinsiDetailPage() {
           </button>
           
           <button 
-            onClick={() => {
-              alert('Fungsi ekspor Google Sheets berhasil disimulasikan! Menghasilkan berkas Excel...');
-            }} 
+            onClick={handleExport} 
             className="btn btn-secondary text-sm flex items-center gap-2"
           >
             <Download size={16} />

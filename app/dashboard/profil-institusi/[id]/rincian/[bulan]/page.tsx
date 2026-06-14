@@ -7,8 +7,10 @@ import Header from '@/components/layout/Header';
 import { useAppStore } from '@/lib/store';
 import { getRincianPengeluaranBulanan } from '@/lib/data';
 import { fmtRupiah } from '@/lib/utils/formatters';
+import { exportToExcel } from '@/lib/utils/excelExport';
 import { RincianPengeluaranItem } from '@/types';
 import { ArrowLeft, Download, Plus } from 'lucide-react';
+
 
 export default function RincianPengeluaranPage() {
   const params = useParams();
@@ -71,16 +73,25 @@ export default function RincianPengeluaranPage() {
     setEditValue(String(value));
   };
 
-  const commitEdit = () => {
+  const commitEdit = async () => {
     if (!editingCell) return;
     const parsed = Number(editValue);
     if (!isNaN(parsed) && parsed >= 0) {
+      let updatedItem: any = null;
       setItems(prev => prev.map(item => {
         if (item.id !== editingCell.id) return item;
         const harga = editingCell.field === 'harga_satuan' ? parsed : item.harga_satuan;
         const qty = editingCell.field === 'qty' ? parsed : item.qty;
-        return { ...item, harga_satuan: harga, qty, jumlah: harga * qty };
+        updatedItem = { ...item, harga_satuan: harga, qty, jumlah: harga * qty };
+        return updatedItem;
       }));
+      if (updatedItem && !editingCell.id.startsWith('ri-new-')) {
+        const { updateRincianPengeluaranItem } = await import('@/lib/data');
+        await updateRincianPengeluaranItem(editingCell.id, {
+          [editingCell.field === 'harga_satuan' ? 'harga_satuan' : 'qty']: parsed,
+          jumlah: updatedItem.jumlah
+        });
+      }
     }
     setEditingCell(null);
   };
@@ -116,16 +127,81 @@ export default function RincianPengeluaranPage() {
   };
 
   // ===== Add new item =====
-  const addItem = () => {
+  const addItem = async () => {
     const newId = `ri-new-${Date.now()}`;
-    setItems(prev => [...prev, {
+    const nextNomor = items.length + 1;
+    const newItem = {
       id: newId,
-      nomor: prev.length + 1,
+      nomor: nextNomor,
       nama_produk_jasa: 'Item Baru',
       harga_satuan: 0,
       qty: 1,
       jumlah: 0,
-    }]);
+    };
+    setItems(prev => [...prev, newItem]);
+
+    const { createRincianPengeluaranItem } = await import('@/lib/data');
+    await createRincianPengeluaranItem({
+      institusi_id: institusiId,
+      nomor_bulan: nomorBulan,
+      nomor: nextNomor,
+      nama_produk_jasa: 'Item Baru',
+      harga_satuan: 0,
+      qty: 1,
+      jumlah: 0
+    });
+  };
+
+  const handleExport = async () => {
+    const headers = ['Nomor', 'Nama Produk / Jasa', 'Harga Satuan (Rp)', 'Qty', 'Jumlah (Rp)'];
+    
+    const rows = items.map((row, idx) => {
+      const rowNum = idx + 2; // header is row 1
+      return [
+        { value: row.nomor, align: 'center' },
+        { value: row.nama_produk_jasa },
+        { value: row.harga_satuan, isCurrency: true },
+        { value: row.qty, align: 'center' },
+        { value: { formula: `C${rowNum}*D${rowNum}` }, isCurrency: true }
+      ];
+    });
+
+    const subtotalIndex = items.length + 2;
+    const pajakIndex = subtotalIndex + 1;
+    const totalIndex = subtotalIndex + 2;
+
+    const summaryRows = [
+      [
+        { value: '', bold: true },
+        { value: 'Sub Total', bold: true },
+        { value: '', bold: true },
+        { value: '', bold: true },
+        { value: { formula: `SUM(E2:E${subtotalIndex-1})` }, isCurrency: true, bold: true }
+      ],
+      [
+        { value: '' },
+        { value: `Pajak ${pajakPersen}%` },
+        { value: '' },
+        { value: '' },
+        { value: { formula: `ROUND(E${subtotalIndex}*${pajakPersen}/100, 0)` }, isCurrency: true }
+      ],
+      [
+        { value: '', bold: true },
+        { value: 'Total', bold: true },
+        { value: '', bold: true },
+        { value: '', bold: true },
+        { value: { formula: `E${subtotalIndex}+E${pajakIndex}` }, isCurrency: true, bold: true, textColor: '065F46' }
+      ]
+    ];
+
+    await exportToExcel(`Laporan_Rincian_Pengeluaran_${rincianData.bulan}_${activeTahun}.xlsx`, [
+      {
+        name: rincianData.bulan,
+        headers,
+        rows: [...rows, ...summaryRows],
+        columnWidths: [10, 35, 20, 12, 20]
+      }
+    ]);
   };
 
   return (
@@ -173,7 +249,7 @@ export default function RincianPengeluaranPage() {
             <Plus size={14} />
             Tambah Item
           </button>
-          <button className="btn btn-primary">
+          <button className="btn btn-primary" onClick={handleExport}>
             <Download size={14} />
             Ekspor Excel
           </button>
@@ -246,3 +322,4 @@ export default function RincianPengeluaranPage() {
     </div>
   );
 }
+

@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import Header from '@/components/layout/Header';
-import { usersData } from '@/lib/data';
+import { usersData, createUser, updateUser } from '@/lib/data';
 import { User, UserRole } from '@/types';
 import { Search, Plus, Edit3, Trash2, Shield, ShieldCheck, Eye, UserCheck, UserX } from 'lucide-react';
 
@@ -52,36 +52,40 @@ export default function UsersPage() {
     setShowModal(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formUsername || !formEmail) return;
 
+    setShowModal(false);
     if (editUser) {
       setData(prev => prev.map(u => u.id === editUser.id ? { ...u, username: formUsername, email: formEmail, role: formRole } : u));
+      await updateUser(editUser.id, { username: formUsername, email: formEmail, role: formRole });
     } else {
-      setData(prev => [...prev, {
-        id: String(Date.now()),
-        username: formUsername,
-        email: formEmail,
-        role: formRole,
-        is_active: true,
-        created_at: new Date().toISOString(),
-      }]);
+      const success = await createUser(formUsername, formEmail, formRole);
+      if (success) {
+        setData([...usersData]);
+      } else {
+        alert('Gagal menambahkan user baru ke database.');
+      }
     }
-    setShowModal(false);
   };
 
-  const handleToggleActive = (id: string) => {
+  const handleToggleActive = async (id: string) => {
     const user = data.find(u => u.id === id);
     if (user?.role === 'SUPER_ADMIN') return;
     setData(prev => prev.map(u => u.id === id ? { ...u, is_active: !u.is_active } : u));
+    if (user) {
+      await updateUser(id, { is_active: !user.is_active });
+    }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     const user = data.find(u => u.id === id);
     if (user?.role === 'SUPER_ADMIN') { alert('Super Admin tidak bisa dihapus!'); return; }
     if (!confirm('Hapus user ini?')) return;
     setData(prev => prev.map(u => u.id === id ? { ...u, is_active: false } : u));
+    await updateUser(id, { is_active: false });
   };
+
 
   const getInitials = (name: string) => {
     return name.split('.').map(s => s[0]?.toUpperCase()).join('').slice(0, 2);

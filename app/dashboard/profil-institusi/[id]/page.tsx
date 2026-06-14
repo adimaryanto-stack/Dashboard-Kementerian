@@ -5,7 +5,12 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/layout/Header';
 import { useAppStore } from '@/lib/store';
-import { getProfilInstitusi } from '@/lib/data';
+import { 
+  getProfilInstitusi, 
+  updateSumberDana, 
+  updatePengeluaranBulanan, 
+  updateInstitusiPendidikan 
+} from '@/lib/data';
 import { fmtRupiah } from '@/lib/utils/formatters';
 import { SumberDanaInstitusi, PengeluaranBulananInstitusi } from '@/types';
 import { ArrowLeft, Banknote, CreditCard, TrendingUp, TrendingDown, Edit3 } from 'lucide-react';
@@ -28,7 +33,7 @@ export default function ProfilInstitusiDetailPage() {
     if (profilData) {
       setSumberDana(profilData.sumber_dana);
       setPengeluaran(profilData.pengeluaran_bulanan);
-      setNomorRekening(profilData.institusi.nomor_rekening);
+      setNomorRekening(profilData.institusi.nomor_rekening || '');
     }
   }, [profilData]);
 
@@ -70,7 +75,7 @@ export default function ProfilInstitusiDetailPage() {
     setEditSDValue(String(value));
   };
 
-  const commitEditSD = () => {
+  const commitEditSD = async () => {
     if (!editingSD) return;
     const parsed = Number(editSDValue);
     if (!isNaN(parsed) && parsed >= 0) {
@@ -80,6 +85,9 @@ export default function ProfilInstitusiDetailPage() {
         const realisasi = editingSD.field === 'realisasi' ? parsed : item.realisasi;
         return { ...item, nominal, realisasi, saldo_di_bank: nominal - realisasi };
       }));
+      await updateSumberDana(editingSD.id, {
+        [editingSD.field]: parsed
+      });
     }
     setEditingSD(null);
   };
@@ -90,7 +98,7 @@ export default function ProfilInstitusiDetailPage() {
     setEditPBValue(String(value));
   };
 
-  const commitEditPB = () => {
+  const commitEditPB = async () => {
     if (!editingPB) return;
     const parsed = Number(editPBValue);
     if (!isNaN(parsed) && parsed >= 0) {
@@ -100,6 +108,9 @@ export default function ProfilInstitusiDetailPage() {
         const qty = editingPB.field === 'qty' ? parsed : item.qty;
         return { ...item, nominal_pengeluaran: nom, qty, sub_total: nom * qty };
       }));
+      await updatePengeluaranBulanan(editingPB.id, {
+        [editingPB.field === 'nominal_pengeluaran' ? 'nominal_pengeluaran' : 'qty']: parsed
+      });
     }
     setEditingPB(null);
   };
@@ -198,8 +209,16 @@ export default function ProfilInstitusiDetailPage() {
                   type="text"
                   value={nomorRekening}
                   onChange={(e) => setNomorRekening(e.target.value)}
-                  onBlur={() => setEditingRekening(false)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') setEditingRekening(false); }}
+                  onBlur={async () => {
+                    setEditingRekening(false);
+                    await updateInstitusiPendidikan(id, { nomor_rekening: nomorRekening });
+                  }}
+                  onKeyDown={async (e) => { 
+                    if (e.key === 'Enter') {
+                      setEditingRekening(false); 
+                      await updateInstitusiPendidikan(id, { nomor_rekening: nomorRekening });
+                    } 
+                  }}
                   className="bg-white/70 border border-accent rounded px-2 py-0.5 text-sm font-mono outline-none"
                 />
               ) : (

@@ -8,10 +8,12 @@ import {
   AlokasiKabupatenKota,
   InstitusiPendidikan,
   User,
+  UserRole,
   DashboardSummary,
   Jenjang,
   ProfilInstitusi,
   RincianPengeluaranBulanan,
+  RincianPengeluaranItem,
   JenjangBreakdownProvinsi,
   SumberDanaInstitusi,
   PengeluaranBulananInstitusi,
@@ -39,6 +41,29 @@ function getSupabaseConfig() {
   return { url, anonKey };
 }
 
+// Helper for paginated fetch to bypass PostgREST 1000-row limit
+async function fetchPaginated(url: string, headers: HeadersInit): Promise<any[]> {
+  let allData: any[] = [];
+  let offset = 0;
+  const limit = 1000;
+
+  while (true) {
+    const sep = url.includes('?') ? '&' : '?';
+    const res = await fetch(`${url}${sep}limit=${limit}&offset=${offset}`, { headers });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error(`Error details for ${url}:`, text);
+      throw new Error(`Failed to fetch paginated data for ${url}: ${res.statusText}`);
+    }
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) break;
+    allData = allData.concat(data);
+    if (data.length < limit) break;
+    offset += limit;
+  }
+  return allData;
+}
+
 // Global initialization function to fetch and populate caches in parallel
 export async function initDbConnection(force = false) {
   if (isInitialized && !force) return true;
@@ -55,48 +80,23 @@ export async function initDbConnection(force = false) {
   };
 
   try {
-    const [taRes, provRes, kabkotaRes, instRes, sdRes, pbRes, userRes] = await Promise.all([
-      fetch(`${url}/rest/v1/tahun_anggaran?select=*&order=tahun.asc`, { headers }),
-      fetch(`${url}/rest/v1/alokasi_provinsi?select=*,provinsi(*)&order=id.asc`, { headers }),
-      fetch(`${url}/rest/v1/alokasi_kabupaten_kota?select=*,kabupaten_kota(*)&order=id.asc`, { headers }),
-      fetch(`${url}/rest/v1/institusi_pendidikan?select=*&order=id.asc`, { headers }),
-      fetch(`${url}/rest/v1/sumber_dana_institusi?select=*&order=id.asc`, { headers }),
-      fetch(`${url}/rest/v1/pengeluaran_bulanan_institusi?select=*&order=id.asc`, { headers }),
-      fetch(`${url}/rest/v1/users?select=*&order=id.asc`, { headers }),
+    const [taData, provData, kabkotaData, instData, sdData, pbData, userData] = await Promise.all([
+      fetchPaginated(`${url}/rest/v1/tahun_anggaran?select=*&order=tahun.asc`, headers),
+      fetchPaginated(`${url}/rest/v1/alokasi_provinsi?select=*,provinsi(*)&order=id.asc`, headers),
+      fetchPaginated(`${url}/rest/v1/alokasi_kabupaten_kota?select=*,kabupaten_kota(*)&order=id.asc`, headers),
+      fetchPaginated(`${url}/rest/v1/institusi_pendidikan?select=*&order=id.asc`, headers),
+      fetchPaginated(`${url}/rest/v1/sumber_dana_institusi?select=*&order=id.asc`, headers),
+      fetchPaginated(`${url}/rest/v1/pengeluaran_bulanan_institusi?select=*&order=id.asc`, headers),
+      fetchPaginated(`${url}/rest/v1/users?select=*&order=id.asc`, headers),
     ]);
 
-    const results = [
-      { name: 'tahun_anggaran', res: taRes },
-      { name: 'alokasi_provinsi', res: provRes },
-      { name: 'alokasi_kabupaten_kota', res: kabkotaRes },
-      { name: 'institusi_pendidikan', res: instRes },
-      { name: 'sumber_dana_institusi', res: sdRes },
-      { name: 'pengeluaran_bulanan_institusi', res: pbRes },
-      { name: 'users', res: userRes }
-    ];
-
-    let hasFailed = false;
-    for (const r of results) {
-      if (!r.res.ok) {
-        hasFailed = true;
-        console.error(`Supabase table fetch failed: ${r.name} - Status: ${r.res.status} ${r.res.statusText}`);
-        try {
-          r.res.clone().text().then(text => console.error(`Error body for ${r.name}:`, text));
-        } catch (e) {}
-      }
-    }
-
-    if (hasFailed) {
-      throw new Error('One or more table fetches failed.');
-    }
-
-    tahunAnggaranData = await taRes.json();
-    alokasiProvinsiData = await provRes.json();
-    alokasiKabupatenKotaData = await kabkotaRes.json();
-    institusiPendidikanData = await instRes.json();
-    sumberDanaData = await sdRes.json();
-    pengeluaranBulananData = await pbRes.json();
-    usersData = await userRes.json();
+    tahunAnggaranData = taData;
+    alokasiProvinsiData = provData;
+    alokasiKabupatenKotaData = kabkotaData;
+    institusiPendidikanData = instData;
+    sumberDanaData = sdData;
+    pengeluaranBulananData = pbData;
+    usersData = userData;
 
     isInitialized = true;
     console.log('Successfully synchronized database with Supabase.');
@@ -389,3 +389,378 @@ export function getJenjangBreakdownByProvinsi(
     };
   });
 }
+
+// ============================================
+// Supabase Database Mutations (Sprint 4)
+// ============================================
+
+export async function updateTahunAnggaran(id: string, updates: Partial<TahunAnggaran>) {
+  const { url, anonKey } = getSupabaseConfig();
+  try {
+    const res = await fetch(`${url}/rest/v1/tahun_anggaran?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: {
+        'apikey': anonKey,
+        'Authorization': `Bearer ${anonKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updates),
+    });
+    if (res.ok) {
+      await initDbConnection(true); // reload local cache
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error('Failed to update tahun_anggaran:', err);
+    return false;
+  }
+}
+
+export async function createTahunAnggaran(tahun: number, total_anggaran: number) {
+  const { url, anonKey } = getSupabaseConfig();
+  try {
+    const res = await fetch(`${url}/rest/v1/tahun_anggaran`, {
+      method: 'POST',
+      headers: {
+        'apikey': anonKey,
+        'Authorization': `Bearer ${anonKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        tahun,
+        total_anggaran,
+        status: 'DRAFT',
+        created_at: new Date().toISOString(),
+      }),
+    });
+    if (res.ok) {
+      await initDbConnection(true);
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error('Failed to create tahun_anggaran:', err);
+    return false;
+  }
+}
+
+export async function deleteTahunAnggaran(id: string) {
+  const { url, anonKey } = getSupabaseConfig();
+  try {
+    const res = await fetch(`${url}/rest/v1/tahun_anggaran?id=eq.${id}`, {
+      method: 'DELETE',
+      headers: {
+        'apikey': anonKey,
+        'Authorization': `Bearer ${anonKey}`,
+      },
+    });
+    if (res.ok) {
+      await initDbConnection(true);
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error('Failed to delete tahun_anggaran:', err);
+    return false;
+  }
+}
+
+export async function createUser(username: string, email: string, role: UserRole) {
+  const { url, anonKey } = getSupabaseConfig();
+  try {
+    const res = await fetch(`${url}/rest/v1/users`, {
+      method: 'POST',
+      headers: {
+        'apikey': anonKey,
+        'Authorization': `Bearer ${anonKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        username,
+        email,
+        role,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      }),
+    });
+    if (res.ok) {
+      await initDbConnection(true);
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error('Failed to create user:', err);
+    return false;
+  }
+}
+
+export async function updateUser(id: string, updates: Partial<User>) {
+  const { url, anonKey } = getSupabaseConfig();
+  try {
+    const res = await fetch(`${url}/rest/v1/users?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: {
+        'apikey': anonKey,
+        'Authorization': `Bearer ${anonKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updates),
+    });
+    if (res.ok) {
+      await initDbConnection(true);
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error('Failed to update user:', err);
+    return false;
+  }
+}
+
+export async function updateSumberDana(id: string, updates: Partial<SumberDanaInstitusi>) {
+  const { url, anonKey } = getSupabaseConfig();
+  try {
+    const res = await fetch(`${url}/rest/v1/sumber_dana_institusi?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: {
+        'apikey': anonKey,
+        'Authorization': `Bearer ${anonKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updates),
+    });
+    if (res.ok) {
+      await initDbConnection(true);
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error('Failed to update sumber_dana_institusi:', err);
+    return false;
+  }
+}
+
+export async function updatePengeluaranBulanan(id: string, updates: Partial<PengeluaranBulananInstitusi>) {
+  const { url, anonKey } = getSupabaseConfig();
+  try {
+    const res = await fetch(`${url}/rest/v1/pengeluaran_bulanan_institusi?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: {
+        'apikey': anonKey,
+        'Authorization': `Bearer ${anonKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updates),
+    });
+    if (res.ok) {
+      await initDbConnection(true);
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error('Failed to update pengeluaran_bulanan_institusi:', err);
+    return false;
+  }
+}
+
+export async function createRincianPengeluaranItem(item: {
+  institusi_id: string;
+  nomor_bulan: number;
+  nomor: number;
+  nama_produk_jasa: string;
+  harga_satuan: number;
+  qty: number;
+  jumlah: number;
+}) {
+  const { url, anonKey } = getSupabaseConfig();
+  try {
+    const res = await fetch(`${url}/rest/v1/rincian_pengeluaran_item`, {
+      method: 'POST',
+      headers: {
+        'apikey': anonKey,
+        'Authorization': `Bearer ${anonKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(item),
+    });
+    if (res.ok) {
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error('Failed to create rincian_pengeluaran_item:', err);
+    return false;
+  }
+}
+
+export async function updateRincianPengeluaranItem(id: string, updates: Partial<RincianPengeluaranItem>) {
+  const { url, anonKey } = getSupabaseConfig();
+  try {
+    const res = await fetch(`${url}/rest/v1/rincian_pengeluaran_item?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: {
+        'apikey': anonKey,
+        'Authorization': `Bearer ${anonKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updates),
+    });
+    if (res.ok) {
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error('Failed to update rincian_pengeluaran_item:', err);
+    return false;
+  }
+}
+
+export async function updateInstitusiPendidikan(
+  id: string,
+  updates: { nominal_alokasi?: number; realisasi_total?: number }
+) {
+  const { url, anonKey } = getSupabaseConfig();
+  const headers = {
+    'apikey': anonKey,
+    'Authorization': `Bearer ${anonKey}`,
+    'Content-Type': 'application/json',
+  };
+
+  try {
+    // 1. Fetch current institution state
+    const instRes = await fetch(`${url}/rest/v1/institusi_pendidikan?id=eq.${id}`, { headers });
+    if (!instRes.ok) throw new Error('Failed to fetch institution');
+    const [inst] = await instRes.json();
+    if (!inst) throw new Error('Institution not found');
+
+    const newNominal = updates.nominal_alokasi !== undefined ? updates.nominal_alokasi : inst.nominal_alokasi;
+    const newRealisasi = updates.realisasi_total !== undefined ? updates.realisasi_total : inst.realisasi_total;
+    const newSelisih = newNominal - newRealisasi;
+    const newPct = newNominal > 0 ? (newRealisasi / newNominal) * 100 : 0;
+
+    // 2. Patch institution in DB
+    const patchInstRes = await fetch(`${url}/rest/v1/institusi_pendidikan?id=eq.${id}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({
+        nominal_alokasi: newNominal,
+        realisasi_total: newRealisasi,
+        selisih: newSelisih,
+        persentase_penyerapan: newPct,
+        updated_at: new Date().toISOString()
+      }),
+    });
+    if (!patchInstRes.ok) throw new Error('Failed to patch institution');
+
+    // 3. Trigger cascade update to parent Kabupaten/Kota
+    const kabkotaId = inst.kabupaten_kota_id;
+    if (kabkotaId) {
+      const allInstsRes = await fetch(`${url}/rest/v1/institusi_pendidikan?kabupaten_kota_id=eq.${kabkotaId}`, { headers });
+      if (allInstsRes.ok) {
+        const allInsts = await allInstsRes.json();
+        const totalNominalKab = allInsts.reduce((s: number, i: any) => s + (i.id === id ? newNominal : i.nominal_alokasi), 0);
+        const totalRealisasiKab = allInsts.reduce((s: number, i: any) => s + (i.id === id ? newRealisasi : i.realisasi_total), 0);
+
+        const alokasiKabRes = await fetch(`${url}/rest/v1/alokasi_kabupaten_kota?kabupaten_kota_id=eq.${kabkotaId}`, { headers });
+        if (alokasiKabRes.ok) {
+          const alokasiKabs = await alokasiKabRes.json();
+          for (const alokasiKab of alokasiKabs) {
+            const selisihKab = totalNominalKab - totalRealisasiKab;
+            const pctKab = totalNominalKab > 0 ? (totalRealisasiKab / totalNominalKab) * 100 : 0;
+
+            const patchKabRes = await fetch(`${url}/rest/v1/alokasi_kabupaten_kota?id=eq.${alokasiKab.id}`, {
+              method: 'PATCH',
+              headers,
+              body: JSON.stringify({
+                nominal_alokasi: totalNominalKab,
+                realisasi_total: totalRealisasiKab,
+                selisih: selisihKab,
+                persentase_penyerapan: pctKab,
+                updated_at: new Date().toISOString()
+              })
+            });
+
+            if (patchKabRes.ok) {
+              // 4. Trigger cascade update to parent Provinsi
+              const provId = alokasiKab.kabupaten_kota?.provinsi_id || (alokasiKab.alokasi_provinsi_id ? 
+                await (async () => {
+                  const apRes = await fetch(`${url}/rest/v1/alokasi_provinsi?id=eq.${alokasiKab.alokasi_provinsi_id}`, { headers });
+                  if (apRes.ok) {
+                    const [ap] = await apRes.json();
+                    return ap?.provinsi_id;
+                  }
+                  return null;
+                })() : null);
+
+              if (provId) {
+                const allKabkotasOfProvRes = await fetch(`${url}/rest/v1/kabupaten_kota?provinsi_id=eq.${provId}`, { headers });
+                if (allKabkotasOfProvRes.ok) {
+                  const kabkotasOfProv = await allKabkotasOfProvRes.json();
+                  const kabkotaIds = kabkotasOfProv.map((k: any) => k.id);
+
+                  const allAlokasiKabsRes = await fetch(`${url}/rest/v1/alokasi_kabupaten_kota?kabupaten_kota_id=in.(${kabkotaIds.join(',')})`, { headers });
+                  if (allAlokasiKabsRes.ok) {
+                    const allAlokasiKabs = await allAlokasiKabsRes.json();
+                    const totalNominalProv = allAlokasiKabs.reduce((s: number, k: any) => 
+                      s + (k.id === alokasiKab.id ? totalNominalKab : k.nominal_alokasi), 0);
+                    const totalRealisasiProv = allAlokasiKabs.reduce((s: number, k: any) => 
+                      s + (k.id === alokasiKab.id ? totalRealisasiKab : k.realisasi_total), 0);
+                    const selisihProv = totalNominalProv - totalRealisasiProv;
+                    const pctProv = totalNominalProv > 0 ? (totalRealisasiProv / totalNominalProv) * 100 : 0;
+
+                    const alokasiProvRes = await fetch(`${url}/rest/v1/alokasi_provinsi?provinsi_id=eq.${provId}`, { headers });
+                    if (alokasiProvRes.ok) {
+                      const alokasiProvs = await alokasiProvRes.json();
+                      for (const alokasiProv of alokasiProvs) {
+                        const patchProvRes = await fetch(`${url}/rest/v1/alokasi_provinsi?id=eq.${alokasiProv.id}`, {
+                          method: 'PATCH',
+                          headers,
+                          body: JSON.stringify({
+                            nominal_alokasi: totalNominalProv,
+                            realisasi_total: totalRealisasiProv,
+                            selisih: selisihProv,
+                            persentase_penyerapan: pctProv,
+                            updated_at: new Date().toISOString()
+                          })
+                        });
+
+                        if (patchProvRes.ok) {
+                          // 5. Trigger cascade update to parent APBN (tahun_anggaran)
+                          const taId = alokasiProv.tahun_anggaran_id;
+                          if (taId) {
+                            const allAlokasiProvsRes = await fetch(`${url}/rest/v1/alokasi_provinsi?tahun_anggaran_id=eq.${taId}`, { headers });
+                            if (allAlokasiProvsRes.ok) {
+                              const allAlokasiProvs = await allAlokasiProvsRes.json();
+                              const totalNominalTA = allAlokasiProvs.reduce((s: number, p: any) => 
+                                s + (p.id === alokasiProv.id ? totalNominalProv : p.nominal_alokasi), 0);
+
+                              await fetch(`${url}/rest/v1/tahun_anggaran?id=eq.${taId}`, {
+                                method: 'PATCH',
+                                headers,
+                                body: JSON.stringify({
+                                  total_anggaran: totalNominalTA
+                                })
+                              });
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    await initDbConnection(true);
+    return true;
+  } catch (err) {
+    console.error('Failed to update institusi_pendidikan and cascade:', err);
+    return false;
+  }
+}
+

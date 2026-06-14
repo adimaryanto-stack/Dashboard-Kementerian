@@ -6,10 +6,17 @@ import Link from 'next/link';
 import Header from '@/components/layout/Header';
 import PctBadge from '@/components/ui/PctBadge';
 import { useAppStore } from '@/lib/store';
-import { alokasiProvinsiData, getKabkotaByProvinsi, getJenjangBreakdownByKabkota, getInstitusiByKabkota, tahunAnggaranData } from '@/lib/data';
+import { 
+  alokasiProvinsiData, 
+  getKabkotaByProvinsi, 
+  getInstitusiByKabkota, 
+  tahunAnggaranData,
+  updateInstitusiPendidikan 
+} from '@/lib/data';
 import { fmtRupiah } from '@/lib/utils/formatters';
 import { AlokasiProvinsi, AlokasiKabupatenKota, InstitusiPendidikan } from '@/types';
 import { ArrowLeft, Banknote, Download, School, Sparkles } from 'lucide-react';
+import { exportToExcel, getPctColorHex } from '@/lib/utils/excelExport';
 
 export default function KabkotaDetailPage() {
   const params = useParams();
@@ -109,8 +116,35 @@ export default function KabkotaDetailPage() {
 
   // Jenjang Breakdown calculation (linked to dynamic district school list total budget)
   const jenjangBreakdown = useMemo(() => {
-    return getJenjangBreakdownByKabkota(kabkotaId, totals.nominal);
-  }, [kabkotaId, totals.nominal]);
+    const counts = { UNIVERSITAS: 0, SMA: 0, SMP: 0, SD: 0, PAUD: 0 };
+    const budgets = { UNIVERSITAS: 0, SMA: 0, SMP: 0, SD: 0, PAUD: 0 };
+
+    schoolList.forEach((item) => {
+      if (item.jenjang in counts) {
+        counts[item.jenjang]++;
+        budgets[item.jenjang] += item.nominal_alokasi;
+      }
+    });
+
+    const labels = {
+      UNIVERSITAS: 'Universitas (Strata 1)',
+      SMA: 'Sekolah Menengah Atas (SMA)',
+      SMP: 'Sekolah Menengah Pertama (SMP)',
+      SD: 'Sekolah Dasar (SD)',
+      PAUD: 'Pendidikan Anak Usia Dini (PAUD)',
+    };
+
+    return (Object.keys(labels) as Array<keyof typeof labels>).map((j, i) => {
+      const budget = budgets[j];
+      return {
+        nomor: i + 1,
+        jenjang: labels[j],
+        jumlah_sekolah: counts[j],
+        nominal_keseluruhan: budget,
+        porsi_anggaran: totals.nominal > 0 ? Math.round((budget / totals.nominal) * 1000) / 10 : 0,
+      };
+    });
+  }, [schoolList, totals.nominal]);
 
   // Inline editing functions
   const startEdit = (rowId: string, field: 'nominal_alokasi' | 'realisasi_total', currentValue: number) => {
@@ -118,7 +152,7 @@ export default function KabkotaDetailPage() {
     setEditValue(String(currentValue));
   };
 
-  const commitEdit = () => {
+  const commitEdit = async () => {
     if (!editingCell) return;
     const parsed = Number(editValue);
     if (!isNaN(parsed) && parsed >= 0) {
@@ -134,8 +168,113 @@ export default function KabkotaDetailPage() {
           persentase_penyerapan: nominal > 0 ? Math.round((realisasi / nominal) * 1000) / 10 : 0
         };
       }));
+      await updateInstitusiPendidikan(editingCell.id, {
+        [editingCell.field]: parsed
+      });
     }
     setEditingCell(null);
+  };
+
+  const handleExport = async () => {
+    const summaryHeaders = [
+      'Nomor', 'Tahun Anggaran', 'Nominal (Rp)', 'Realisasi (Rp)', 'Nominal Selisih (Rp)', 'Persentase penyerapan (%)'
+    ];
+    const summaryColorHex = getPctColorHex(totals.persentase);
+    const summaryRows = [
+      [
+        { value: 1, align: 'center' },
+        { value: activeTahun, align: 'center' },
+        { value: totals.nominal, isCurrency: true },
+        { value: totals.realisasi, isCurrency: true },
+        { value: { formula: 'C2-D2' }, isCurrency: true, textColor: '991B1B' },
+        { 
+          value: { formula: 'IF(C2>0, D2/C2, 0)' }, 
+          isPercent: true, 
+          bgColor: summaryColorHex.bg, 
+          textColor: summaryColorHex.text,
+          bold: true,
+          align: 'center'
+        }
+      ]
+    ];
+
+    const jenjangHeaders = [
+      'Nomor', 'Jenjang Pendidikan', 'Jumlah Sekolah', 'Nominal Keseluruhan (Rp)', 'Porsi Anggaran (%)'
+    ];
+    const jenjangRows = jenjangBreakdown.map((row, idx) => {
+      const rowNum = idx + 2;
+      return [
+        { value: row.nomor, align: 'center' },
+        { value: row.jenjang },
+        { value: row.jumlah_sekolah, align: 'center' },
+        { value: row.nominal_keseluruhan, isCurrency: true },
+        { value: { formula: `D${rowNum}/SUM(D$2:D$6)` }, isPercent: true, align: 'center', bold: true }
+      ];
+    });
+
+    const schoolHeaders = [
+      'Nomor', 'Nama Sekolah / Universitas', 'Status', 'Nominal Anggaran (Rp)', 'Realisasi (Rp)', 'Nominal Selisih (Rp)', 'Persentase penyerapan (%)'
+    ];
+    const schoolRows = schoolList.map((row, idx) => {
+      const rowNum = idx + 2;
+      const colorHex = getPctColorHex(row.persentase_penyerapan);
+      return [
+        { value: idx + 1, align: 'center' },
+        { value: row.nama_institusi },
+        { value: row.status_sekolah, align: 'center' },
+        { value: row.nominal_alokasi, isCurrency: true },
+        { value: row.realisasi_total, isCurrency: true },
+        { value: { formula: `D${rowNum}-E${rowNum}` }, isCurrency: true, textColor: '991B1B' },
+        { 
+          value: { formula: `IF(D${rowNum}>0, E${rowNum}/D${rowNum}, 0)` }, 
+          isPercent: true, 
+          bgColor: colorHex.bg, 
+          textColor: colorHex.text,
+          bold: true,
+          align: 'center'
+        }
+      ];
+    });
+
+    const totalRowIndex = schoolList.length + 2;
+    const totalColorHex = getPctColorHex(totals.persentase);
+    const totalsRow = [
+      { value: '', bold: true },
+      { value: 'Realisasi Anggaran', bold: true },
+      { value: '', bold: true },
+      { value: { formula: `SUM(D2:D${totalRowIndex-1})` }, isCurrency: true, bold: true },
+      { value: { formula: `SUM(E2:E${totalRowIndex-1})` }, isCurrency: true, bold: true },
+      { value: { formula: `D${totalRowIndex}-E${totalRowIndex}` }, isCurrency: true, bold: true, textColor: '991B1B' },
+      { 
+        value: { formula: `IF(D${totalRowIndex}>0, E${totalRowIndex}/D${totalRowIndex}, 0)` }, 
+        isPercent: true, 
+        bold: true, 
+        bgColor: totalColorHex.bg,
+        textColor: totalColorHex.text,
+        align: 'center'
+      }
+    ];
+
+    await exportToExcel(`Laporan_Kabkota_${kabkotaData.kabupaten_kota.nama_kabupaten_kota}_${activeTahun}.xlsx`, [
+      {
+        name: 'Summary',
+        headers: summaryHeaders,
+        rows: summaryRows,
+        columnWidths: [8, 18, 22, 22, 22, 25]
+      },
+      {
+        name: 'Proporsi Sekolah',
+        headers: jenjangHeaders,
+        rows: jenjangRows,
+        columnWidths: [8, 28, 16, 25, 20]
+      },
+      {
+        name: 'Alokasi Sekolah',
+        headers: schoolHeaders,
+        rows: [...schoolRows, totalsRow],
+        columnWidths: [8, 35, 12, 22, 22, 22, 25]
+      }
+    ]);
   };
 
   const renderEditableCell = (row: InstitusiPendidikan, field: 'nominal_alokasi' | 'realisasi_total') => {
@@ -199,9 +338,7 @@ export default function KabkotaDetailPage() {
             </button>
             
             <button 
-              onClick={() => {
-                alert('Fungsi ekspor Google Sheets berhasil disimulasikan! Menghasilkan berkas Excel...');
-              }} 
+              onClick={handleExport} 
               className="btn btn-secondary text-sm flex items-center gap-2"
             >
               <Download size={16} />

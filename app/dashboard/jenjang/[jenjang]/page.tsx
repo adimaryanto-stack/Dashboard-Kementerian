@@ -6,10 +6,18 @@ import Link from 'next/link';
 import Header from '@/components/layout/Header';
 import PctBadge from '@/components/ui/PctBadge';
 import { useAppStore } from '@/lib/store';
-import { getInstitusiByJenjang, alokasiProvinsiData, getKabkotaByProvinsi, tahunAnggaranData } from '@/lib/data';
+import { 
+  getInstitusiByJenjang, 
+  alokasiProvinsiData, 
+  getKabkotaByProvinsi, 
+  tahunAnggaranData,
+  updateInstitusiPendidikan
+} from '@/lib/data';
 import { fmtRupiah, fmtTriliun } from '@/lib/utils/formatters';
+import { exportToExcel, getPctColorHex } from '@/lib/utils/excelExport';
 import { Jenjang, InstitusiPendidikan } from '@/types';
-import { Search, Download, Plus, Upload } from 'lucide-react';
+import { Search, Download, Plus, Upload, ChevronLeft, ChevronRight } from 'lucide-react';
+
 
 const jenjangLabels: Record<string, { label: string; jenjang: Jenjang }> = {
   universitas: { label: 'Universitas', jenjang: 'UNIVERSITAS' },
@@ -47,6 +55,8 @@ export default function JenjangPage() {
   }, [config.jenjang, activeTahun]);
 
   const [data, setData] = useState<InstitusiPendidikan[]>(rawData);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     setData(rawData);
@@ -59,6 +69,11 @@ export default function JenjangPage() {
   const [editingCell, setEditingCell] = useState<{ id: string; field: 'nominal' | 'realisasi' } | null>(null);
   const [editValue, setEditValue] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, selectedProvinsiId, selectedKabKotaName, selectedStatus]);
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -136,7 +151,7 @@ export default function JenjangPage() {
       result = result.filter(inst => inst.nama_institusi.toLowerCase().includes(search.toLowerCase()));
     }
     return result;
-  }, [data, search, selectedProvinsiId, selectedKabKotaName]);
+  }, [data, search, selectedProvinsiId, selectedKabKotaName, selectedStatus]);
 
   const totals = useMemo(() => {
     const nom = filtered.reduce((s, i) => s + i.nominal_alokasi, 0);
@@ -144,12 +159,18 @@ export default function JenjangPage() {
     return { nominal: nom, realisasi: real, selisih: nom - real, pct: nom > 0 ? (real / nom) * 100 : 0 };
   }, [filtered]);
 
+  const totalPages = Math.ceil(filtered.length / itemsPerPage) || 1;
+  const paginatedData = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filtered.slice(start, start + itemsPerPage);
+  }, [filtered, currentPage]);
+
   const startEdit = (id: string, field: 'nominal' | 'realisasi', value: number) => {
     setEditingCell({ id, field });
     setEditValue(String(value));
   };
 
-  const commitEdit = () => {
+  const commitEdit = async () => {
     if (!editingCell) return;
     const parsed = Number(editValue);
     if (!isNaN(parsed) && parsed >= 0) {
@@ -165,9 +186,76 @@ export default function JenjangPage() {
           persentase_penyerapan: nominal > 0 ? Math.round((realisasi / nominal) * 1000) / 10 : 0,
         };
       }));
+      await updateInstitusiPendidikan(editingCell.id, {
+        [editingCell.field === 'nominal' ? 'nominal_alokasi' : 'realisasi_total']: parsed
+      });
     }
     setEditingCell(null);
   };
+
+  const handleExport = async () => {
+    const headers = [
+      'No', 'Nama Sekolah', 'Status', 'Kabupaten/Kota', 'Provinsi',
+      'Nominal (Rp)', 'Realisasi (Rp)', 'Selisih (Rp)', 'Persentase Penyerapan (%)', 'NPSN'
+    ];
+
+    const rows = filtered.map((row, idx) => {
+      const rowNum = idx + 2; // Header is row 1
+      const colorHex = getPctColorHex(row.persentase_penyerapan);
+      
+      return [
+        { value: idx + 1, align: 'center' },
+        { value: row.nama_institusi },
+        { value: row.status_sekolah, align: 'center' },
+        { value: row.kabupaten_kota_nama },
+        { value: row.provinsi_nama },
+        { value: row.nominal_alokasi, isCurrency: true },
+        { value: row.realisasi_total, isCurrency: true },
+        { value: { formula: `F${rowNum}-G${rowNum}` }, isCurrency: true, textColor: '991B1B' },
+        { 
+          value: { formula: `IF(F${rowNum}>0, G${rowNum}/F${rowNum}, 0)` }, 
+          isPercent: true, 
+          bgColor: colorHex.bg, 
+          textColor: colorHex.text,
+          bold: true,
+          align: 'center'
+        },
+        { value: row.npsn, align: 'center' }
+      ];
+    });
+
+    const totalRowIndex = filtered.length + 2;
+    const totalColorHex = getPctColorHex(totals.pct);
+    const totalsRow = [
+      { value: '', bold: true },
+      { value: `TOTAL (${filtered.length})`, bold: true },
+      { value: '', bold: true },
+      { value: '', bold: true },
+      { value: '', bold: true },
+      { value: { formula: `SUM(F2:F${totalRowIndex-1})` }, isCurrency: true, bold: true },
+      { value: { formula: `SUM(G2:G${totalRowIndex-1})` }, isCurrency: true, bold: true },
+      { value: { formula: `F${totalRowIndex}-G${totalRowIndex}` }, isCurrency: true, bold: true, textColor: '991B1B' },
+      { 
+        value: { formula: `IF(F${totalRowIndex}>0, G${totalRowIndex}/F${totalRowIndex}, 0)` }, 
+        isPercent: true, 
+        bold: true, 
+        bgColor: totalColorHex.bg,
+        textColor: totalColorHex.text,
+        align: 'center'
+      },
+      { value: '', bold: true }
+    ];
+
+    await exportToExcel(`Laporan_Anggaran_${config.label}_${activeTahun}.xlsx`, [
+      {
+        name: config.label,
+        headers,
+        rows: [...rows, totalsRow],
+        columnWidths: [8, 32, 12, 22, 18, 20, 20, 20, 25, 12]
+      }
+    ]);
+  };
+
 
   const renderEditableCell = (row: InstitusiPendidikan, field: 'nominal' | 'realisasi') => {
     const value = field === 'nominal' ? row.nominal_alokasi : row.realisasi_total;
@@ -274,7 +362,7 @@ export default function JenjangPage() {
             <Plus size={14} />
             Tambah
           </button>
-          <button className="btn btn-primary">
+          <button className="btn btn-primary" onClick={handleExport}>
             <Download size={14} />
             Ekspor Excel
           </button>
@@ -298,9 +386,9 @@ export default function JenjangPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((row, idx) => (
+              {paginatedData.map((row, idx) => (
                 <tr key={row.id} className="hover:bg-indigo-50/50 transition">
-                  <td className="sheet-cell text-center text-text-muted text-xs">{idx + 1}</td>
+                  <td className="sheet-cell text-center text-text-muted text-xs">{(currentPage - 1) * itemsPerPage + idx + 1}</td>
                   <td className="sheet-cell text-left font-medium text-text-primary">
                     <Link href={`/dashboard/profil-institusi/${row.id}`} className="hover:text-accent hover:underline transition-colors">
                       {row.nama_institusi}
@@ -344,6 +432,69 @@ export default function JenjangPage() {
           </table>
         </div>
 
+        {/* Pagination */}
+        <div className="mt-4 flex items-center justify-between bg-white px-4 py-3 border border-slate-200 rounded-lg shadow-sm">
+          <div className="flex flex-1 justify-between sm:hidden">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="relative inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Sebelumnya
+            </button>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="relative ml-3 inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Selanjutnya
+            </button>
+          </div>
+          <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between animate-fade-in">
+            <div>
+              <p className="text-xs text-slate-700">
+                Menampilkan <span className="font-semibold">{filtered.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}</span> sampai{' '}
+                <span className="font-semibold">{Math.min(currentPage * itemsPerPage, filtered.length)}</span> dari{' '}
+                <span className="font-semibold">{filtered.length}</span> data institusi
+              </p>
+            </div>
+            <div>
+              <nav className="isolate inline-flex -space-x-px rounded-md shadow-xs" aria-label="Pagination">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="relative inline-flex items-center rounded-l-md px-2 py-2 text-slate-400 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                {Array.from({ length: totalPages }).map((_, idx) => {
+                  const pageNum = idx + 1;
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`relative inline-flex items-center px-4 py-2 text-xs font-semibold focus:z-20 ${
+                        currentPage === pageNum
+                          ? 'z-10 bg-indigo-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600'
+                          : 'text-slate-900 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:outline-offset-0'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="relative inline-flex items-center rounded-r-md px-2 py-2 text-slate-400 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </nav>
+            </div>
+          </div>
+        </div>
+
         <p className="mt-3 text-xs text-text-muted">
           ✏️ Klik sel untuk edit • Cascade update: Institusi → Kabkota → Provinsi
         </p>
@@ -351,3 +502,4 @@ export default function JenjangPage() {
     </div>
   );
 }
+

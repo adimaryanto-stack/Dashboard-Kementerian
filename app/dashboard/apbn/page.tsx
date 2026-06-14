@@ -5,7 +5,12 @@ import Link from 'next/link';
 import Header from '@/components/layout/Header';
 import { useAppStore } from '@/lib/store';
 import StatusBadge from '@/components/ui/StatusBadge';
-import { tahunAnggaranData, updateTahunAnggaranData } from '@/lib/data';
+import { 
+  tahunAnggaranData, 
+  updateTahunAnggaran, 
+  createTahunAnggaran, 
+  deleteTahunAnggaran 
+} from '@/lib/data';
 import { fmtRupiah } from '@/lib/utils/formatters';
 import { TahunAnggaran, BudgetStatus } from '@/types';
 import { Plus, Eye, Power, Lock, Trash2, Edit3 } from 'lucide-react';
@@ -19,46 +24,59 @@ export default function APBNPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
 
-  const handleActivate = (id: string) => {
+  const handleActivate = async (id: string) => {
     if (!confirm('Aktifkan tahun ini? Tahun ACTIVE sebelumnya akan di-CLOSED.')) return;
+    
+    // Optimistic UI update
     const updated = data.map(t => ({
       ...t,
-      status: t.id === id ? 'ACTIVE' : t.status === 'ACTIVE' ? 'CLOSED' : t.status
+      status: (t.id === id ? 'ACTIVE' : t.status === 'ACTIVE' ? 'CLOSED' : t.status) as BudgetStatus
     }));
     setData(updated);
-    updateTahunAnggaranData(updated);
+
+    // Patch to DB
+    const promises = data.map(t => {
+      if (t.id === id) {
+        return updateTahunAnggaran(t.id, { status: 'ACTIVE' });
+      } else if (t.status === 'ACTIVE') {
+        return updateTahunAnggaran(t.id, { status: 'CLOSED' });
+      }
+      return Promise.resolve(true);
+    });
+    await Promise.all(promises);
+    setData([...tahunAnggaranData]);
   };
 
-  const handleClose = (id: string) => {
+  const handleClose = async (id: string) => {
     if (!confirm('Tutup tahun ini? Data akan menjadi read-only.')) return;
     const updated = data.map(t => t.id === id ? { ...t, status: 'CLOSED' as BudgetStatus } : t);
     setData(updated);
-    updateTahunAnggaranData(updated);
+    await updateTahunAnggaran(id, { status: 'CLOSED' });
+    setData([...tahunAnggaranData]);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     const item = data.find(t => t.id === id);
     if (item?.status !== 'DRAFT') return;
     if (!confirm('Hapus tahun ini?')) return;
     const updated = data.filter(t => t.id !== id);
     setData(updated);
-    updateTahunAnggaranData(updated);
+    await deleteTahunAnggaran(id);
+    setData([...tahunAnggaranData]);
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!newTahun || !newTotal) return;
     const exists = data.find(t => t.tahun === Number(newTahun));
     if (exists) { alert('Tahun sudah ada!'); return; }
-    const updated = [...data, {
-      id: String(Date.now()),
-      tahun: Number(newTahun),
-      total_anggaran: Number(newTotal),
-      status: 'DRAFT' as BudgetStatus,
-      created_at: new Date().toISOString(),
-    }];
-    setData(updated);
-    updateTahunAnggaranData(updated);
+    
     setShowModal(false);
+    const success = await createTahunAnggaran(Number(newTahun), Number(newTotal));
+    if (success) {
+      setData([...tahunAnggaranData]);
+    } else {
+      alert('Gagal menambahkan tahun anggaran ke database Supabase.');
+    }
     setNewTahun('');
     setNewTotal('');
   };
@@ -70,16 +88,18 @@ export default function APBNPage() {
     setEditValue(String(currentVal));
   };
 
-  const commitInlineEdit = () => {
+  const commitInlineEdit = async () => {
     if (!editingId) return;
     const parsed = Number(editValue);
     if (!isNaN(parsed) && parsed >= 0) {
       const updated = data.map(t => t.id === editingId ? { ...t, total_anggaran: parsed } : t);
       setData(updated);
-      updateTahunAnggaranData(updated);
+      await updateTahunAnggaran(editingId, { total_anggaran: parsed });
+      setData([...tahunAnggaranData]);
     }
     setEditingId(null);
   };
+
 
   return (
     <div className="min-h-screen">

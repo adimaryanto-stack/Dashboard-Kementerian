@@ -7,6 +7,7 @@ import PctBadge from '@/components/ui/PctBadge';
 import { useAppStore } from '@/lib/store';
 import { alokasiProvinsiData, tahunAnggaranData } from '@/lib/data';
 import { fmtRupiah, fmtTriliun } from '@/lib/utils/formatters';
+import { exportToExcel, getPctColorHex } from '@/lib/utils/excelExport';
 import { AlokasiProvinsi } from '@/types';
 import { Search, Download, RefreshCw, Plus } from 'lucide-react';
 
@@ -82,6 +83,60 @@ export default function ProvinsiPage() {
     setEditingCell(null);
   };
 
+  const handleExport = async () => {
+    const headers = [
+      'No', 'Nama Provinsi', 'Nominal (Rp)', 'Realisasi (Rp)', 'Selisih (Rp)', 'Persentase Penyerapan (%)'
+    ];
+
+    const rows = filtered.map((row, idx) => {
+      const rowNum = idx + 2; // header is row 1
+      const colorHex = getPctColorHex(row.persentase_penyerapan);
+      return [
+        { value: idx + 1, align: 'center' },
+        { value: row.provinsi.nama_provinsi },
+        { value: row.nominal_alokasi, isCurrency: true },
+        { value: row.realisasi_total, isCurrency: true },
+        { value: { formula: `C${rowNum}-D${rowNum}` }, isCurrency: true, textColor: '991B1B' },
+        { 
+          value: { formula: `IF(C${rowNum}>0, D${rowNum}/C${rowNum}, 0)` }, 
+          isPercent: true, 
+          bgColor: colorHex.bg, 
+          textColor: colorHex.text,
+          bold: true,
+          align: 'center'
+        }
+      ];
+    });
+
+    const totalRowIndex = filtered.length + 2;
+    const totalColorHex = getPctColorHex(totals.pct);
+    const totalsRow = [
+      { value: '', bold: true },
+      { value: `TOTAL (${filtered.length} Provinsi)`, bold: true },
+      { value: { formula: `SUM(C2:C${totalRowIndex-1})` }, isCurrency: true, bold: true },
+      { value: { formula: `SUM(D2:D${totalRowIndex-1})` }, isCurrency: true, bold: true },
+      { value: { formula: `C${totalRowIndex}-D${totalRowIndex}` }, isCurrency: true, bold: true, textColor: '991B1B' },
+      { 
+        value: { formula: `IF(C${totalRowIndex}>0, D${totalRowIndex}/C${totalRowIndex}, 0)` }, 
+        isPercent: true, 
+        bold: true, 
+        bgColor: totalColorHex.bg,
+        textColor: totalColorHex.text,
+        align: 'center'
+      }
+    ];
+
+    await exportToExcel(`Laporan_Anggaran_Provinsi_${activeTahun}.xlsx`, [
+      {
+        name: 'Provinsi',
+        headers,
+        rows: [...rows, totalsRow],
+        columnWidths: [8, 25, 22, 22, 22, 25]
+      }
+    ]);
+  };
+
+
   const renderCell = (row: AlokasiProvinsi, field: 'nominal' | 'realisasi') => {
     const value = field === 'nominal' ? row.nominal_alokasi : row.realisasi_total;
     const isEditing = editingCell?.id === row.id && editingCell?.field === field;
@@ -144,7 +199,7 @@ export default function ProvinsiPage() {
             <RefreshCw size={14} />
             Refresh
           </button>
-          <button className="btn btn-primary">
+          <button className="btn btn-primary" onClick={handleExport}>
             <Download size={14} />
             Ekspor Excel
           </button>
