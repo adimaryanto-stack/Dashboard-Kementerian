@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
-import { tahunAnggaranData } from '@/lib/data';
+import { tahunAnggaranData, institusiPendidikanData } from '@/lib/data';
 import { Bell, Search, Menu, CheckCheck, Info, AlertTriangle, Sparkles } from 'lucide-react';
 
 interface HeaderProps {
@@ -24,6 +24,61 @@ export default function Header({ title, subtitle }: HeaderProps) {
   const router = useRouter();
   const { activeTahun, setActiveTahun, toggleSidebar } = useAppStore();
   const activeTahunList = tahunAnggaranData.filter(t => t.status !== 'DRAFT');
+
+  // Search States
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowSearchDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSearchChange = (val: string) => {
+    setSearchQuery(val);
+    const trimmed = val.trim().toLowerCase();
+    if (trimmed.length < 2) {
+      setSearchResults([]);
+      setShowSearchDropdown(false);
+      return;
+    }
+
+    const filtered = (institusiPendidikanData || []).filter(
+      item =>
+        (item.npsn && item.npsn.toLowerCase().includes(trimmed)) ||
+        (item.nama_institusi && item.nama_institusi.toLowerCase().includes(trimmed))
+    ).slice(0, 5);
+
+    setSearchResults(filtered);
+    setShowSearchDropdown(true);
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = searchQuery.trim().toLowerCase();
+    if (!trimmed) return;
+
+    const exactMatch = (institusiPendidikanData || []).find(
+      item => item.npsn === trimmed || item.npsn?.toLowerCase() === trimmed
+    );
+
+    if (exactMatch) {
+      router.push(`/dashboard/profil-institusi/${exactMatch.id}`);
+      setShowSearchDropdown(false);
+      setSearchQuery('');
+    } else if (searchResults.length > 0) {
+      router.push(`/dashboard/profil-institusi/${searchResults[0].id}`);
+      setShowSearchDropdown(false);
+      setSearchQuery('');
+    }
+  };
 
   // Notification States
   const [showNotifications, setShowNotifications] = useState(false);
@@ -101,13 +156,57 @@ export default function Header({ title, subtitle }: HeaderProps) {
           </div>
 
           {/* Search */}
-          <div className="relative hidden md:block">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-            <input
-              type="text"
-              placeholder="Cari..."
-              className="search-input w-40"
-            />
+          <div ref={searchRef} className="relative hidden md:block w-48 focus-within:w-72 transition-all duration-300">
+            <form onSubmit={handleSearchSubmit}>
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Cari NPSN / nama..."
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                onFocus={() => {
+                  if (searchQuery.trim().length >= 2) {
+                    setShowSearchDropdown(true);
+                  }
+                }}
+                className="search-input"
+                style={{ width: '100%' }}
+              />
+            </form>
+
+            {showSearchDropdown && (
+              <div className="absolute top-full mt-2 left-0 w-80 bg-white rounded-xl border border-slate-200/80 shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="max-h-60 overflow-y-auto divide-y divide-slate-100">
+                  {searchResults.length === 0 ? (
+                    <div className="p-4 text-center text-xs text-text-muted">
+                      Tidak ditemukan institusi "{searchQuery}"
+                    </div>
+                  ) : (
+                    searchResults.map((school) => (
+                      <div
+                        key={school.id}
+                        onClick={() => {
+                          router.push(`/dashboard/profil-institusi/${school.id}`);
+                          setShowSearchDropdown(false);
+                          setSearchQuery('');
+                        }}
+                        className="p-3 hover:bg-slate-50 transition cursor-pointer flex flex-col gap-0.5 text-left"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-bold text-text-primary truncate">{school.nama_institusi}</span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-100">
+                            {school.jenjang}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-text-muted">
+                          NPSN: {school.npsn} • {school.kabupaten_kota_nama}, {school.provinsi_nama}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Notifications */}
