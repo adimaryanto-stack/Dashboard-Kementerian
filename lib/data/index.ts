@@ -227,7 +227,9 @@ export function getProfilInstitusi(id: string, _tahun: number = 2026): ProfilIns
   if (!institusi) return null;
 
   const sumber_dana = sumberDanaData.filter((sd) => sd.institusi_id === id);
-  const pengeluaran_bulanan = pengeluaranBulananData.filter((pb) => pb.institusi_id === id);
+  const pengeluaran_bulanan = pengeluaranBulananData
+    .filter((pb) => pb.institusi_id === id)
+    .sort((a, b) => a.nomor - b.nomor);
 
   const totalNominalSumber = sumber_dana.reduce((s, d) => s + d.nominal, 0);
   const totalRealisasiSumber = sumber_dana.reduce((s, d) => s + d.realisasi, 0);
