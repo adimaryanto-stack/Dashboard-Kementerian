@@ -5,11 +5,11 @@ import Header from '@/components/layout/Header';
 import MetricCard from '@/components/ui/MetricCard';
 import PctBadge from '@/components/ui/PctBadge';
 import { getDashboardSummary } from '@/lib/data';
-import { fmtTriliun, fmtPct, getPctColor } from '@/lib/utils/formatters';
+import { fmtTriliun, fmtPct } from '@/lib/utils/formatters';
 import { Wallet, TrendingUp, PieChart, GraduationCap } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  LineChart, Line, Legend, Area, AreaChart
+  Legend, Area, AreaChart
 } from 'recharts';
 import { useMemo } from 'react';
 import { useAppStore } from '@/lib/store';

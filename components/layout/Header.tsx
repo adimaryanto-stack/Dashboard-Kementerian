@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useAppStore } from '@/lib/store';
+import { useRouter } from 'next/navigation';
 import { tahunAnggaranData } from '@/lib/data';
 import { Bell, Search, Menu, CheckCheck, Info, AlertTriangle, Sparkles } from 'lucide-react';
 
@@ -16,9 +17,11 @@ interface NotificationItem {
   time: string;
   unread: boolean;
   type: 'info' | 'success' | 'warning';
+  url: string;
 }
 
 export default function Header({ title, subtitle }: HeaderProps) {
+  const router = useRouter();
   const { activeTahun, setActiveTahun, toggleSidebar } = useAppStore();
   const activeTahunList = tahunAnggaranData.filter(t => t.status !== 'DRAFT');
 
@@ -31,6 +34,7 @@ export default function Header({ title, subtitle }: HeaderProps) {
       time: '10 menit yang lalu',
       unread: true,
       type: 'success',
+      url: '/dashboard/provinsi/p-1',
     },
     {
       id: 'n2',
@@ -38,6 +42,7 @@ export default function Header({ title, subtitle }: HeaderProps) {
       time: '1 jam yang lalu',
       unread: true,
       type: 'info',
+      url: '/dashboard/profil-institusi/inst-universitas-0',
     },
     {
       id: 'n3',
@@ -45,6 +50,7 @@ export default function Header({ title, subtitle }: HeaderProps) {
       time: '3 jam yang lalu',
       unread: true,
       type: 'warning',
+      url: '/dashboard/provinsi/p-6/kabkota/k-p-6-0',
     },
   ]);
 
@@ -58,8 +64,10 @@ export default function Header({ title, subtitle }: HeaderProps) {
     setNotifications(prev => prev.map(n => ({ ...n, unread: false })));
   };
 
-  const toggleRead = (id: string) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, unread: !n.unread } : n));
+  const handleNotificationClick = (n: NotificationItem) => {
+    setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, unread: false } : item));
+    setShowNotifications(false);
+    router.push(n.url);
   };
 
   return (
@@ -151,7 +159,7 @@ export default function Header({ title, subtitle }: HeaderProps) {
                       notifications.map((n) => (
                         <div 
                           key={n.id} 
-                          onClick={() => toggleRead(n.id)}
+                          onClick={() => handleNotificationClick(n)}
                           className={`p-3.5 flex gap-3 cursor-pointer transition-colors ${n.unread ? 'bg-indigo-50/40 hover:bg-indigo-50/60' : 'hover:bg-slate-50'}`}
                         >
                           <div className="mt-0.5 flex-shrink-0">

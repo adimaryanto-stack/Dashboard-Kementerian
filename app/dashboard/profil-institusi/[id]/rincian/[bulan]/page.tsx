@@ -1,14 +1,13 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/layout/Header';
 import { useAppStore } from '@/lib/store';
-import { getRincianPengeluaranBulanan } from '@/lib/data';
 import { fmtRupiah } from '@/lib/utils/formatters';
 import { exportToExcel } from '@/lib/utils/excelExport';
-import { RincianPengeluaranItem } from '@/types';
+import { RincianPengeluaranItem, RincianPengeluaranBulanan } from '@/types';
 import { ArrowLeft, Download, Plus } from 'lucide-react';
 
 
@@ -21,7 +20,7 @@ export default function RincianPengeluaranPage() {
 
   // State for async data
   const [items, setItems] = useState<RincianPengeluaranItem[]>([]);
-  const [rincianData, setRincianData] = useState<any>(null);
+  const [rincianData, setRincianData] = useState<RincianPengeluaranBulanan | null>(null);
   const [editingCell, setEditingCell] = useState<{ id: string; field: 'harga_satuan' | 'qty' } | null>(null);
   const [editValue, setEditValue] = useState('');
   const [loading, setLoading] = useState(true);
@@ -77,7 +76,7 @@ export default function RincianPengeluaranPage() {
     if (!editingCell) return;
     const parsed = Number(editValue);
     if (!isNaN(parsed) && parsed >= 0) {
-      let updatedItem: any = null;
+      let updatedItem: RincianPengeluaranItem | null = null;
       setItems(prev => prev.map(item => {
         if (item.id !== editingCell.id) return item;
         const harga = editingCell.field === 'harga_satuan' ? parsed : item.harga_satuan;
@@ -168,7 +167,6 @@ export default function RincianPengeluaranPage() {
 
     const subtotalIndex = items.length + 2;
     const pajakIndex = subtotalIndex + 1;
-    const totalIndex = subtotalIndex + 2;
 
     const summaryRows = [
       [

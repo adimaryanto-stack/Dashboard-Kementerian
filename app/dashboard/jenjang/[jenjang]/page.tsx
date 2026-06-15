@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/layout/Header';
@@ -10,7 +10,6 @@ import {
   getInstitusiByJenjang, 
   alokasiProvinsiData, 
   getKabkotaByProvinsi, 
-  tahunAnggaranData,
   updateInstitusiPendidikan
 } from '@/lib/data';
 import { fmtRupiah, fmtTriliun } from '@/lib/utils/formatters';
@@ -34,33 +33,18 @@ export default function JenjangPage() {
   const { activeTahun } = useAppStore();
 
   const rawData = useMemo(() => {
-    const list = getInstitusiByJenjang(config.jenjang);
-    const targetTahun = tahunAnggaranData.find(t => t.tahun === activeTahun) || tahunAnggaranData[6];
-    const baseTahun = tahunAnggaranData[6];
-    const scale = targetTahun.total_anggaran > 0 ? targetTahun.total_anggaran / baseTahun.total_anggaran : 1.0;
-    const seed = (activeTahun % 7) || 1;
-    const shift = 0.95 + (seed * 0.012);
+    return getInstitusiByJenjang(config.jenjang);
+  }, [config.jenjang]);
 
-    return list.map(item => {
-      const nominal = Math.round(item.nominal_alokasi * scale);
-      const realisasi = Math.min(nominal, Math.round(item.realisasi_total * scale * shift));
-      return {
-        ...item,
-        nominal_alokasi: nominal,
-        realisasi_total: realisasi,
-        selisih: nominal - realisasi,
-        persentase_penyerapan: nominal > 0 ? Math.round((realisasi / nominal) * 1000) / 10 : 0
-      };
-    });
-  }, [config.jenjang, activeTahun]);
-
+  const [prevRawData, setPrevRawData] = useState(rawData);
   const [data, setData] = useState<InstitusiPendidikan[]>(rawData);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 100;
 
-  useEffect(() => {
+  if (rawData !== prevRawData) {
+    setPrevRawData(rawData);
     setData(rawData);
-  }, [rawData]);
+  }
 
   const [search, setSearch] = useState('');
   const [selectedProvinsiId, setSelectedProvinsiId] = useState('');
@@ -69,11 +53,6 @@ export default function JenjangPage() {
   const [editingCell, setEditingCell] = useState<{ id: string; field: 'nominal' | 'realisasi' } | null>(null);
   const [editValue, setEditValue] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Reset page when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search, selectedProvinsiId, selectedKabKotaName, selectedStatus]);
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -121,8 +100,7 @@ export default function JenjangPage() {
     reader.readAsText(file);
   };
 
-  // Reset when jenjang changes
-  useMemo(() => { setData(rawData); }, [rawData]);
+
 
   const kabkotaOptions = useMemo(() => {
     if (!selectedProvinsiId) return [];
@@ -301,6 +279,7 @@ export default function JenjangPage() {
               onChange={(e) => {
                 setSelectedProvinsiId(e.target.value);
                 setSelectedKabKotaName('');
+                setCurrentPage(1);
               }}
               className="select-dropdown"
             >
@@ -314,7 +293,10 @@ export default function JenjangPage() {
             <span className="text-xs text-text-muted">Kab/Kota:</span>
             <select
               value={selectedKabKotaName}
-              onChange={(e) => setSelectedKabKotaName(e.target.value)}
+              onChange={(e) => {
+                setSelectedKabKotaName(e.target.value);
+                setCurrentPage(1);
+              }}
               className="select-dropdown"
               disabled={!selectedProvinsiId}
             >
@@ -328,7 +310,10 @@ export default function JenjangPage() {
             <span className="text-xs text-text-muted">Status:</span>
             <select
               value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
+              onChange={(e) => {
+                setSelectedStatus(e.target.value);
+                setCurrentPage(1);
+              }}
               className="select-dropdown"
             >
               <option value="">Semua Status</option>
@@ -342,7 +327,10 @@ export default function JenjangPage() {
               type="text"
               placeholder={`Cari nama ${config.label.toLowerCase()}...`}
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
               className="search-input"
             />
           </div>

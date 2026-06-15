@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import Header from '@/components/layout/Header';
 import { usersData, createUser, updateUser } from '@/lib/data';
 import { User, UserRole } from '@/types';
-import { Search, Plus, Edit3, Trash2, Shield, ShieldCheck, Eye, UserCheck, UserX } from 'lucide-react';
+import { Search, Plus, Edit3, Trash2, UserCheck, UserX } from 'lucide-react';
 
 const roleConfig: Record<UserRole, { label: string; color: string }> = {
   SUPER_ADMIN: { label: 'Super Admin', color: 'bg-purple-100 text-purple-700 border-purple-300' },

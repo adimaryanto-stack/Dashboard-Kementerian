@@ -71,6 +71,7 @@ export interface InstitusiPendidikan {
   provinsi_nama: string;
   status_sekolah: 'NEGERI' | 'SWASTA';
   nomor_rekening?: string;
+  alamat?: string;
   nominal_alokasi: number;
   realisasi_total: number;
   selisih: number;

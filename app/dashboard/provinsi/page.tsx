@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import Header from '@/components/layout/Header';
 import PctBadge from '@/components/ui/PctBadge';
@@ -14,31 +14,21 @@ import { Search, Download, RefreshCw, Plus } from 'lucide-react';
 export default function ProvinsiPage() {
   const { activeTahun } = useAppStore();
 
-  const scaledProvinsiData = useMemo(() => {
-    const targetTahun = tahunAnggaranData.find(t => t.tahun === activeTahun) || tahunAnggaranData[6];
-    const baseTahun = tahunAnggaranData[6];
-    const scale = targetTahun.total_anggaran > 0 ? targetTahun.total_anggaran / baseTahun.total_anggaran : 1.0;
-    const seed = (activeTahun % 7) || 1;
-    const shift = 0.95 + (seed * 0.012);
+  // Use real Supabase data directly — filter by active tahun_anggaran_id
+  const activeTahunObj = useMemo(() => tahunAnggaranData.find(t => t.tahun === activeTahun), [activeTahun]);
 
-    return alokasiProvinsiData.map(p => {
-      const nominal = Math.round(p.nominal_alokasi * scale);
-      const realisasi = Math.min(nominal, Math.round(p.realisasi_total * scale * shift));
-      return {
-        ...p,
-        nominal_alokasi: nominal,
-        realisasi_total: realisasi,
-        selisih: nominal - realisasi,
-        persentase_penyerapan: nominal > 0 ? (realisasi / nominal) * 100 : 0,
-      };
-    });
-  }, [activeTahun]);
+  const realProvinsiData = useMemo(() => {
+    if (!activeTahunObj) return alokasiProvinsiData;
+    return alokasiProvinsiData.filter(p => p.tahun_anggaran_id === activeTahunObj.id);
+  }, [activeTahunObj]);
 
-  const [data, setData] = useState<AlokasiProvinsi[]>(scaledProvinsiData);
+  const [prevRealData, setPrevRealData] = useState(realProvinsiData);
+  const [data, setData] = useState<AlokasiProvinsi[]>(realProvinsiData);
 
-  useEffect(() => {
-    setData(scaledProvinsiData);
-  }, [scaledProvinsiData]);
+  if (realProvinsiData !== prevRealData) {
+    setPrevRealData(realProvinsiData);
+    setData(realProvinsiData);
+  }
 
   const [search, setSearch] = useState('');
   const [editingCell, setEditingCell] = useState<{ id: string; field: 'nominal' | 'realisasi' } | null>(null);

@@ -1,49 +1,35 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import Header from '@/components/layout/Header';
 import PctBadge from '@/components/ui/PctBadge';
 import { useAppStore } from '@/lib/store';
-import { alokasiProvinsiData, getKabkotaByProvinsi, tahunAnggaranData } from '@/lib/data';
+import { alokasiProvinsiData, getKabkotaByProvinsi } from '@/lib/data';
 import { fmtRupiah, fmtTriliun } from '@/lib/utils/formatters';
 import { exportToExcel, getPctColorHex } from '@/lib/utils/excelExport';
 import { AlokasiKabupatenKota } from '@/types';
-import { Search, Download, RefreshCw, Plus } from 'lucide-react';
+import { Search, Download, Plus } from 'lucide-react';
 
 
 export default function KabupatenKotaPage() {
   const { activeTahun } = useAppStore();
+  // activeTahun used for display/export only — data comes from Supabase directly
   const [selectedProvinsi, setSelectedProvinsi] = useState(alokasiProvinsiData[11].provinsi_id); // Jawa Barat
   const [search, setSearch] = useState('');
   const [editingCell, setEditingCell] = useState<{ id: string; field: 'nominal' | 'realisasi' } | null>(null);
   const [editValue, setEditValue] = useState('');
 
   const rawData = useMemo(() => {
-    const list = getKabkotaByProvinsi(selectedProvinsi);
-    const targetTahun = tahunAnggaranData.find(t => t.tahun === activeTahun) || tahunAnggaranData[6];
-    const baseTahun = tahunAnggaranData[6];
-    const scale = targetTahun.total_anggaran > 0 ? targetTahun.total_anggaran / baseTahun.total_anggaran : 1.0;
-    const seed = (activeTahun % 7) || 1;
-    const shift = 0.95 + (seed * 0.012);
+    return getKabkotaByProvinsi(selectedProvinsi);
+  }, [selectedProvinsi]);
 
-    return list.map(item => {
-      const nominal = Math.round(item.nominal_alokasi * scale);
-      const realisasi = Math.min(nominal, Math.round(item.realisasi_total * scale * shift));
-      return {
-        ...item,
-        nominal_alokasi: nominal,
-        realisasi_total: realisasi,
-        selisih: nominal - realisasi,
-        persentase_penyerapan: nominal > 0 ? Math.round((realisasi / nominal) * 1000) / 10 : 0
-      };
-    });
-  }, [selectedProvinsi, activeTahun]);
-
+  const [prevRawData, setPrevRawData] = useState(rawData);
   const [localData, setLocalData] = useState<AlokasiKabupatenKota[]>(rawData);
 
-  useEffect(() => {
+  if (rawData !== prevRawData) {
+    setPrevRawData(rawData);
     setLocalData(rawData);
-  }, [rawData]);
+  }
 
   const filtered = useMemo(() => {
     if (!search) return localData;

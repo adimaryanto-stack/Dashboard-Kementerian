@@ -13,7 +13,7 @@ import {
 } from '@/lib/data';
 import { fmtRupiah } from '@/lib/utils/formatters';
 import { TahunAnggaran, BudgetStatus } from '@/types';
-import { Plus, Eye, Power, Lock, Trash2, Edit3 } from 'lucide-react';
+import { Plus, Eye, Power, Lock, Trash2 } from 'lucide-react';
 
 export default function APBNPage() {
   const { setActiveTahun } = useAppStore();

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/layout/Header';
@@ -24,18 +24,18 @@ export default function ProfilInstitusiDetailPage() {
   const profilData = useMemo(() => getProfilInstitusi(id, activeTahun), [id, activeTahun]);
 
   // Editable state
-  const [sumberDana, setSumberDana] = useState<SumberDanaInstitusi[]>([]);
-  const [pengeluaran, setPengeluaran] = useState<PengeluaranBulananInstitusi[]>([]);
-  const [nomorRekening, setNomorRekening] = useState('');
+  const [prevProfilData, setPrevProfilData] = useState(profilData);
+  const [sumberDana, setSumberDana] = useState<SumberDanaInstitusi[]>(profilData?.sumber_dana || []);
+  const [pengeluaran, setPengeluaran] = useState<PengeluaranBulananInstitusi[]>(profilData?.pengeluaran_bulanan || []);
+  const [nomorRekening, setNomorRekening] = useState(profilData?.institusi.nomor_rekening || '');
   const [editingRekening, setEditingRekening] = useState(false);
 
-  useEffect(() => {
-    if (profilData) {
-      setSumberDana(profilData.sumber_dana);
-      setPengeluaran(profilData.pengeluaran_bulanan);
-      setNomorRekening(profilData.institusi.nomor_rekening || '');
-    }
-  }, [profilData]);
+  if (profilData !== prevProfilData) {
+    setPrevProfilData(profilData);
+    setSumberDana(profilData?.sumber_dana || []);
+    setPengeluaran(profilData?.pengeluaran_bulanan || []);
+    setNomorRekening(profilData?.institusi.nomor_rekening || '');
+  }
 
   // Sumber Dana editing
   const [editingSD, setEditingSD] = useState<{ id: string; field: 'nominal' | 'realisasi' } | null>(null);
@@ -200,9 +200,17 @@ export default function ProfilInstitusiDetailPage() {
               <Banknote size={18} className="text-indigo-500" />
               <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">Nama Institusi Pendidikan</span>
             </div>
-            <p className="text-lg font-bold text-text-primary mb-2">{institusi.nama_institusi}</p>
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-text-muted">Nomor Rekening Bank Himbara:</span>
+            <p className="text-lg font-bold text-text-primary mb-1">{institusi.nama_institusi}</p>
+            <div className="text-xs text-text-secondary mb-2 flex flex-col gap-1">
+              <div>
+                <span className="text-text-muted">NPSN:</span> <span className="font-mono font-semibold">{institusi.npsn || '—'}</span>
+              </div>
+              <div>
+                <span className="text-text-muted">Alamat:</span> <span className="italic">{institusi.alamat || 'Alamat tidak tersedia'}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-xs border-t border-slate-100 pt-2 mt-2">
+              <span className="text-text-muted">No Rekening:</span>
               {editingRekening ? (
                 <input
                   autoFocus
@@ -219,7 +227,7 @@ export default function ProfilInstitusiDetailPage() {
                       await updateInstitusiPendidikan(id, { nomor_rekening: nomorRekening });
                     } 
                   }}
-                  className="bg-white/70 border border-accent rounded px-2 py-0.5 text-sm font-mono outline-none"
+                  className="bg-white/70 border border-accent rounded px-2 py-0.5 text-xs font-mono outline-none"
                 />
               ) : (
                 <span
@@ -227,7 +235,7 @@ export default function ProfilInstitusiDetailPage() {
                   onClick={() => setEditingRekening(true)}
                 >
                   {nomorRekening || '—'}
-                  <Edit3 size={12} className="text-text-muted" />
+                  <Edit3 size={11} className="text-text-muted" />
                 </span>
               )}
             </div>

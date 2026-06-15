@@ -1,16 +1,16 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/layout/Header';
 import PctBadge from '@/components/ui/PctBadge';
 import { useAppStore } from '@/lib/store';
-import { alokasiProvinsiData, getKabkotaByProvinsi, getJenjangBreakdownByProvinsi, tahunAnggaranData } from '@/lib/data';
-import { fmtRupiah, fmtTriliun } from '@/lib/utils/formatters';
+import { alokasiProvinsiData, getKabkotaByProvinsi, getJenjangBreakdownByProvinsi } from '@/lib/data';
+import { fmtRupiah } from '@/lib/utils/formatters';
 import { exportToExcel, getPctColorHex } from '@/lib/utils/excelExport';
-import { AlokasiProvinsi, AlokasiKabupatenKota, JenjangBreakdownProvinsi } from '@/types';
-import { ArrowLeft, Banknote, Download, Plus, RefreshCw, Sparkles } from 'lucide-react';
+import { AlokasiKabupatenKota } from '@/types';
+import { ArrowLeft, Banknote, Download, Sparkles } from 'lucide-react';
 
 export default function ProvinsiDetailPage() {
   const params = useParams();
@@ -18,75 +18,27 @@ export default function ProvinsiDetailPage() {
   const id = params.id as string; // provinsi_id e.g. p-1
   const { activeTahun } = useAppStore();
 
-  // Find target province data scaled dynamically
+  // Use real Supabase data directly — no scaling
   const provData = useMemo(() => {
-    const targetTahun = tahunAnggaranData.find(t => t.tahun === activeTahun) || tahunAnggaranData[6];
-    const baseTahun = tahunAnggaranData[6];
-    const scale = targetTahun.total_anggaran > 0 ? targetTahun.total_anggaran / baseTahun.total_anggaran : 1.0;
-    const seed = (activeTahun % 7) || 1;
-    const shift = 0.95 + (seed * 0.012);
+    return alokasiProvinsiData.find(p => p.provinsi_id === id) || null;
+  }, [id]);
 
-    const baseData = alokasiProvinsiData.find(p => p.provinsi_id === id);
-    if (!baseData) return null;
-
-    const nominal = Math.round(baseData.nominal_alokasi * scale);
-    const realisasi = Math.min(nominal, Math.round(baseData.realisasi_total * scale * shift));
-
-    return {
-      ...baseData,
-      nominal_alokasi: nominal,
-      realisasi_total: realisasi,
-      selisih: nominal - realisasi,
-      persentase_penyerapan: nominal > 0 ? (realisasi / nominal) * 100 : 0,
-    };
-  }, [id, activeTahun]);
-
-  // Scaled Kabkota list
-  const scaledKabkotaList = useMemo(() => {
-    const list = getKabkotaByProvinsi(id);
-    const targetTahun = tahunAnggaranData.find(t => t.tahun === activeTahun) || tahunAnggaranData[6];
-    const baseTahun = tahunAnggaranData[6];
-    const scale = targetTahun.total_anggaran > 0 ? targetTahun.total_anggaran / baseTahun.total_anggaran : 1.0;
-    const seed = (activeTahun % 7) || 1;
-    const shift = 0.95 + (seed * 0.012);
-
-    return list.map(item => {
-      const nominal = Math.round(item.nominal_alokasi * scale);
-      const realisasi = Math.min(nominal, Math.round(item.realisasi_total * scale * shift));
-      return {
-        ...item,
-        nominal_alokasi: nominal,
-        realisasi_total: realisasi,
-        selisih: nominal - realisasi,
-        persentase_penyerapan: nominal > 0 ? Math.round((realisasi / nominal) * 1000) / 10 : 0
-      };
-    });
-  }, [id, activeTahun]);
+  // Real Kabkota list from Supabase
+  const realKabkotaList = useMemo(() => {
+    return getKabkotaByProvinsi(id);
+  }, [id]);
 
   // States
-  const [kabkotaList, setKabkotaList] = useState<AlokasiKabupatenKota[]>(scaledKabkotaList);
+  const [prevRealKabkotaList, setPrevRealKabkotaList] = useState(realKabkotaList);
+  const [kabkotaList, setKabkotaList] = useState<AlokasiKabupatenKota[]>(realKabkotaList);
 
-  useEffect(() => {
-    setKabkotaList(scaledKabkotaList);
-  }, [scaledKabkotaList]);
+  if (realKabkotaList !== prevRealKabkotaList) {
+    setPrevRealKabkotaList(realKabkotaList);
+    setKabkotaList(realKabkotaList);
+  }
 
   const [editingCell, setEditingCell] = useState<{ id: string; field: 'nominal_alokasi' | 'realisasi_total' } | null>(null);
   const [editValue, setEditValue] = useState('');
-
-  if (!provData) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center bg-white p-8 rounded-xl shadow-md border border-slate-100 max-w-md">
-          <h2 className="text-xl font-bold text-text-primary mb-2">Provinsi Tidak Ditemukan</h2>
-          <p className="text-text-muted mb-6">ID Provinsi: "{id}" tidak terdaftar di sistem.</p>
-          <button onClick={() => router.back()} className="btn btn-primary inline-flex items-center gap-2">
-            <ArrowLeft size={16} />
-            Kembali
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   // Calculate dynamic totals based on Kabupaten/Kota state
   const totals = useMemo(() => {
@@ -101,6 +53,21 @@ export default function ProvinsiDetailPage() {
   const jenjangBreakdown = useMemo(() => {
     return getJenjangBreakdownByProvinsi(id, totals.nominal);
   }, [id, totals.nominal]);
+
+  if (!provData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center bg-white p-8 rounded-xl shadow-md border border-slate-100 max-w-md">
+          <h2 className="text-xl font-bold text-text-primary mb-2">Provinsi Tidak Ditemukan</h2>
+          <p className="text-text-muted mb-6">ID Provinsi: &quot;{id}&quot; tidak terdaftar di sistem.</p>
+          <button onClick={() => router.back()} className="btn btn-primary inline-flex items-center gap-2">
+            <ArrowLeft size={16} />
+            Kembali
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Inline editing functions
   const startEdit = (rowId: string, field: 'nominal_alokasi' | 'realisasi_total', currentValue: number) => {

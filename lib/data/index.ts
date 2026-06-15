@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 // ============================================
 // Supabase Data Connector — Sistem Transparansi Anggaran Pendidikan
 // Fetches directly from Supabase PostgREST API using env credentials
@@ -221,7 +222,7 @@ export function getDashboardSummary(tahun: number = 2026): DashboardSummary {
   };
 }
 
-export function getProfilInstitusi(id: string, tahun: number = 2026): ProfilInstitusi | null {
+export function getProfilInstitusi(id: string, _tahun: number = 2026): ProfilInstitusi | null {
   const institusi = institusiPendidikanData.find((item) => item.id === id);
   if (!institusi) return null;
 
@@ -248,7 +249,7 @@ export function getAllInstitusi(): InstitusiPendidikan[] {
 export async function fetchRincianPengeluaranBulanan(
   institusiId: string,
   nomorBulan: number,
-  tahun: number = 2026
+  _tahun: number = 2026
 ): Promise<RincianPengeluaranBulanan | null> {
   const { url, anonKey } = getSupabaseConfig();
   const headers = {
@@ -294,15 +295,6 @@ export async function fetchRincianPengeluaranBulanan(
   }
 }
 
-// Legacy synchronous fallback returning null
-export function getRincianPengeluaranBulanan(
-  institusiId: string,
-  nomorBulan: number,
-  tahun: number = 2026
-): RincianPengeluaranBulanan | null {
-  return null;
-}
-
 export function getJenjangBreakdownByKabkota(
   kabkotaId: string,
   nominalAlokasi: number
@@ -342,9 +334,9 @@ export function getJenjangBreakdownByKabkota(
 
 export function getInstitusiByKabkota(
   kabkotaId: string,
-  namaKabkota: string,
-  provinsiNama: string,
-  totalNominal: number
+  _namaKabkota: string,
+  _provinsiNama: string,
+  _totalNominal: number
 ): InstitusiPendidikan[] {
   return institusiPendidikanData.filter((item) => item.kabupaten_kota_id === kabkotaId);
 }
@@ -761,6 +753,59 @@ export async function updateInstitusiPendidikan(
   } catch (err) {
     console.error('Failed to update institusi_pendidikan and cascade:', err);
     return false;
+  }
+}
+
+export async function fetchKecamatanForKabkota(kabkotaId: string): Promise<{ id: string; name: string }[]> {
+  const { url, anonKey } = getSupabaseConfig();
+  if (!anonKey) return [];
+  const headers = {
+    'apikey': anonKey,
+    'Authorization': `Bearer ${anonKey}`,
+  };
+
+  try {
+    // 1. Get the kabupaten_kota details from alokasiKabupatenKotaData or Supabase
+    const kk = alokasiKabupatenKotaData.find(item => item.kabupaten_kota_id === kabkotaId)?.kabupaten_kota;
+    if (!kk) {
+      console.warn(`Kabupaten/Kota with ID ${kabkotaId} not found in cache.`);
+      return [];
+    }
+
+    // 2. Normalize name for matching
+    const normKK = kk.nama_kabupaten_kota.toLowerCase()
+      .replace(/^kab\.\s+/, 'kabupaten ')
+      .replace(/^kabupaten\s+/, '')
+      .replace(/^kota\s+/, '')
+      .trim();
+
+    // Query regencies by name to get its UUID
+    const resReg = await fetch(`${url}/rest/v1/regencies?name=ilike.*${normKK}*`, { headers });
+    if (!resReg.ok) {
+      console.error(`Failed to fetch regency for name ${normKK}: ${resReg.statusText}`);
+      return [];
+    }
+    const regData = await resReg.json();
+    if (regData.length === 0) {
+      console.warn(`No regency found in Supabase matching name ${normKK}`);
+      return [];
+    }
+    const reg = regData[0];
+
+    // 3. Fetch all districts (kecamatan) for this regency
+    const resDist = await fetch(`${url}/rest/v1/districts?regency_id=eq.${reg.id}&order=name.asc`, { headers });
+    if (!resDist.ok) {
+      console.error(`Failed to fetch districts for regency ${reg.id}: ${resDist.statusText}`);
+      return [];
+    }
+    const distData = await resDist.json();
+    return distData.map((d: any) => ({
+      id: d.id,
+      name: d.name
+    }));
+  } catch (err) {
+    console.error('Failed in fetchKecamatanForKabkota:', err);
+    return [];
   }
 }
 
