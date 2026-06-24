@@ -91,17 +91,17 @@ Berikut adalah beberapa tampilan utama dari **Dashboard Kementerian** yang berja
 
 | 📊 Halaman Utama Dashboard | 💰 Pengelolaan APBN Pertahun |
 |:---:|:---:|
-| ![Dashboard](./public/screenshots/01-dashboard.png) | ![APBN](./public/screenshots/02-apbn.png) |
+| ![Dashboard](./public/screenshots-v1.4.1/01-dashboard.png) | ![APBN](./public/screenshots-v1.4.1/02-apbn.png) |
 | *Ringkasan APBN Pendidikan Nasional, Chart Tren, & Progress* | *Manajemen status tahun anggaran (Draft, Active, Closed)* |
 
 | 📍 Spreadsheet Provinsi | 🏛️ Spreadsheet Kabupaten / Kota |
 |:---:|:---:|
-| ![Provinsi](./public/screenshots/03-provinsi.png) | ![Kabupaten/Kota](./public/screenshots/04-kabupaten-kota.png) |
+| ![Provinsi](./public/screenshots-v1.4.1/03-provinsi.png) | ![Kabupaten/Kota](./public/screenshots-v1.4.1/04-kabupaten-kota.png) |
 | *Tabel spreadsheet interaktif tingkat provinsi dengan Inline Editing* | *Tabel spreadsheet tingkat Kabupaten/Kota dengan filter cascading* |
 
 | 🎓 Sub-Menu Jenjang Pendidikan | 👥 User Manager (RBAC) |
 |:---:|:---:|
-| ![Jenjang Universitas](./public/screenshots/05-universitas.png) | ![User Manager](./public/screenshots/06-users.png) |
+| ![Jenjang Universitas](./public/screenshots-v1.4.1/05-universitas.png) | ![User Manager](./public/screenshots-v1.4.1/06-users.png) |
 | *Detail alokasi & realisasi per sekolah/universitas dengan pagination* | *Manajemen pengguna lengkap dengan pengaturan Role & Status* |
 
 ---
