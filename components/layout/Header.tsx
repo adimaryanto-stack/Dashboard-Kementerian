@@ -285,7 +285,7 @@ export default function Header({ title, subtitle }: HeaderProps) {
                   </div>
                   
                   <div className="px-4 py-2 border-t border-slate-100 bg-slate-50 text-center">
-                    <span className="text-[10px] text-slate-400 font-semibold">Sistem Transparansi Pendidikan v1.0</span>
+                    <span className="text-[10px] text-slate-400 font-semibold">Dashboard Kementerian v1.4.1</span>
                   </div>
                 </div>
               </>

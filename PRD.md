@@ -1,6 +1,6 @@
 # PRD — Dashboard Kementerian
 
-**Version:** 1.4.0 (Mockup Client-Side Consolidated)  
+**Version:** 1.4.1 (Mockup Client-Side Consolidated)  
 **Date:** 24 Juni 2026  
 **Status:** ✅ APPROVED FOR DEVELOPMENT  
 **Project Type:** Web-Based Spreadsheet Dashboard — Education Budget Transparency  
@@ -151,3 +151,9 @@ Logical schema untuk representasi data relasional dalam aplikasi:
 ### SPRINT 4: Jenjang Pendidikan & Export/Import
 - Halaman detail jenjang pendidikan (Universitas, SMA, SMP, SD, PAUD) dengan pagination.
 - Fungsionalitas Export Excel untuk data provinsi, kabupaten/kota, dan jenjang pendidikan.
+
+### SPRINT 5: User Manager & RBAC (Role-Based Access Control)
+- Pembuatan halaman User Manager dengan data mock user yang komprehensif.
+- Operasi CRUD user (Tambah, Edit, Hapus, Aktif/Nonaktifkan akun).
+- Implementasi Role-Based Access Control (Super Admin, Admin, Admin Provinsi, Admin Kabkota, Viewer, Auditor).
+- Pembatasan menu dan aksi edit data (inline editing terkunci untuk viewer/auditor atau wilayah yang tidak sesuai).

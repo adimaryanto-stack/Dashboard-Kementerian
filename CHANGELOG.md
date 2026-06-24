@@ -4,6 +4,13 @@ Semua perubahan penting pada proyek **Dashboard Kementerian** akan didokumentasi
 
 ---
 
+## [1.4.1] - 24-06-2026
+
+### Diubah
+- Menyelaraskan seluruh dokumen roadmap dan file konfigurasi ke versi **1.4.1**.
+- Menambahkan dokumentasi **Sprint 5 (User Manager & RBAC)** ke dalam peta jalan MVP di berkas `PRD.md`.
+- Memperbarui label footer notifikasi pada komponen header aplikasi agar konsisten menampilkan `"Dashboard Kementerian v1.4.1"`.
+
 ## [1.4.0] - 24-06-2026
 
 ### Ditambahkan

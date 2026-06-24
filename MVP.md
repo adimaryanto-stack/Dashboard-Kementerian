@@ -1,6 +1,6 @@
 # MVP Roadmap & Checklist — Dashboard Kementerian
 
-Dokumen ini melacak fitur-fitur Minimum Viable Product (MVP) yang direncanakan dan diimplementasikan untuk aplikasi **Dashboard Kementerian** (versi `1.4.0`). Seluruh fitur inti di bawah ini telah berhasil dikembangkan dan diuji secara lokal.
+Dokumen ini melacak fitur-fitur Minimum Viable Product (MVP) yang direncanakan dan diimplementasikan untuk aplikasi **Dashboard Kementerian** (versi `1.4.1`). Seluruh fitur inti di bawah ini telah berhasil dikembangkan dan diuji secara lokal.
 
 ---
 
