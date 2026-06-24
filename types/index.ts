@@ -1,6 +1,4 @@
-// ============================================
-// Types — Sistem Transparansi Anggaran Pendidikan
-// ============================================
+// Types — Dashboard Kementerian
 
 export type BudgetStatus = 'DRAFT' | 'ACTIVE' | 'CLOSED';
 export type Jenjang = 'UNIVERSITAS' | 'SMA' | 'SMP' | 'SD' | 'PAUD';

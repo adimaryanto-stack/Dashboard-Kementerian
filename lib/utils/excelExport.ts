@@ -7,7 +7,7 @@ export interface ExcelCellConfig {
   value: any; // Can be a string, number, or formula object like { formula: '...' }
   isCurrency?: boolean;
   isPercent?: boolean;
-  align?: 'left' | 'center' | 'right';
+  align?: string;
   bold?: boolean;
   bgColor?: string; // Hex color e.g., 'E0E7FF'
   textColor?: string;
@@ -78,14 +78,14 @@ export async function exportToExcel(filename: string, sheets: ExcelSheetData[]) 
         // Alignment
         cell.alignment = {
           vertical: 'middle',
-          horizontal: cellConfig.align || (cellConfig.isCurrency || cellConfig.isPercent ? 'right' : 'left')
+          horizontal: (cellConfig.align as any) || (cellConfig.isCurrency || cellConfig.isPercent ? 'right' : 'left')
         };
 
         // Formatting
         if (cellConfig.isCurrency) {
-          cell.numFormat = 'Rp#,##0';
+          cell.numFmt = 'Rp#,##0';
         } else if (cellConfig.isPercent) {
-          cell.numFormat = '0.0%';
+          cell.numFmt = '0.0%';
         }
 
         // Fills / Background Colors

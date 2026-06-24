@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 // ============================================
-// Supabase Data Connector — Sistem Transparansi Anggaran Pendidikan
+// Supabase Data Connector — Dashboard Kementerian
 // Fetches directly from Supabase PostgREST API using env credentials
 // ============================================
 import {
@@ -612,7 +612,7 @@ export async function updateRincianPengeluaranItem(id: string, updates: Partial<
 
 export async function updateInstitusiPendidikan(
   id: string,
-  updates: { nominal_alokasi?: number; realisasi_total?: number }
+  updates: { nominal_alokasi?: number; realisasi_total?: number; nomor_rekening?: string }
 ) {
   const { url, anonKey } = getSupabaseConfig();
   const headers = {
@@ -633,17 +633,23 @@ export async function updateInstitusiPendidikan(
     const newSelisih = newNominal - newRealisasi;
     const newPct = newNominal > 0 ? (newRealisasi / newNominal) * 100 : 0;
 
+    const patchPayload: any = {
+      nominal_alokasi: newNominal,
+      realisasi_total: newRealisasi,
+      selisih: newSelisih,
+      persentase_penyerapan: newPct,
+      updated_at: new Date().toISOString()
+    };
+
+    if (updates.nomor_rekening !== undefined) {
+      patchPayload.nomor_rekening = updates.nomor_rekening;
+    }
+
     // 2. Patch institution in DB
     const patchInstRes = await fetch(`${url}/rest/v1/institusi_pendidikan?id=eq.${id}`, {
       method: 'PATCH',
       headers,
-      body: JSON.stringify({
-        nominal_alokasi: newNominal,
-        realisasi_total: newRealisasi,
-        selisih: newSelisih,
-        persentase_penyerapan: newPct,
-        updated_at: new Date().toISOString()
-      }),
+      body: JSON.stringify(patchPayload),
     });
     if (!patchInstRes.ok) throw new Error('Failed to patch institution');
 

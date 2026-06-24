@@ -85,14 +85,42 @@ Pastikan Anda memiliki [Node.js](https://nodejs.org/) (versi 18+ disarankan) ter
 
 ---
 
+## 📷 Screenshots Aplikasi (Localhost)
+
+Berikut adalah beberapa tampilan utama dari **Dashboard Kementerian** yang berjalan secara lokal:
+
+| 📊 Halaman Utama Dashboard | 💰 Pengelolaan APBN Pertahun |
+|:---:|:---:|
+| ![Dashboard](./public/screenshots/01-dashboard.png) | ![APBN](./public/screenshots/02-apbn.png) |
+| *Ringkasan APBN Pendidikan Nasional, Chart Tren, & Progress* | *Manajemen status tahun anggaran (Draft, Active, Closed)* |
+
+| 📍 Spreadsheet Provinsi | 🏛️ Spreadsheet Kabupaten / Kota |
+|:---:|:---:|
+| ![Provinsi](./public/screenshots/03-provinsi.png) | ![Kabupaten/Kota](./public/screenshots/04-kabupaten-kota.png) |
+| *Tabel spreadsheet interaktif tingkat provinsi dengan Inline Editing* | *Tabel spreadsheet tingkat Kabupaten/Kota dengan filter cascading* |
+
+| 🎓 Sub-Menu Jenjang Pendidikan | 👥 User Manager (RBAC) |
+|:---:|:---:|
+| ![Jenjang Universitas](./public/screenshots/05-universitas.png) | ![User Manager](./public/screenshots/06-users.png) |
+| *Detail alokasi & realisasi per sekolah/universitas dengan pagination* | *Manajemen pengguna lengkap dengan pengaturan Role & Status* |
+
+---
+
 ## 📖 Dokumentasi Lengkap (PRD)
 
 Dokumentasi rancangan produk, arsitektur, skema database, dan peta jalan (roadmap) pengembangan telah digabung menjadi satu file untuk memudahkan referensi:
 - Cek file **[`PRD.md`](./PRD.md)**
+- Detail target/checklist fungsionalitas minimal layak produk: **[`MVP.md`](./MVP.md)**
 
 ---
 
 ## 📝 Changelog & Update Terakhir
+
+### **24 Juni 2026 (Version 1.4.0)**
+- **Penamaan Resmi Project:** Menyeragamkan seluruh dokumen dan file konfigurasi menggunakan nama **Dashboard Kementerian**.
+- **Dokumentasi & MVP Checklist:** Membuat file [`MVP.md`](./MVP.md) yang melacak seluruh pencapaian fungsionalitas dan menandainya sebagai selesai (`[x]`).
+- **Screenshot Implementasi:** Menangkap dan melampirkan screenshot terbaru aplikasi dari localhost (Port 3009) ke dalam `README.md`.
+- **Rilis v1.4.0:** Memperbarui versi dependency `package.json` dan mematangkan integrasi mockup client-side untuk demo deployment yang lancar.
 
 ### **13 Juni 2026**
 - **Vercel Deploy Readiness:**

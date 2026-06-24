@@ -76,20 +76,24 @@ export default function RincianPengeluaranPage() {
     if (!editingCell) return;
     const parsed = Number(editValue);
     if (!isNaN(parsed) && parsed >= 0) {
-      let updatedItem: RincianPengeluaranItem | null = null;
-      setItems(prev => prev.map(item => {
-        if (item.id !== editingCell.id) return item;
-        const harga = editingCell.field === 'harga_satuan' ? parsed : item.harga_satuan;
-        const qty = editingCell.field === 'qty' ? parsed : item.qty;
-        updatedItem = { ...item, harga_satuan: harga, qty, jumlah: harga * qty };
-        return updatedItem;
-      }));
-      if (updatedItem && !editingCell.id.startsWith('ri-new-')) {
-        const { updateRincianPengeluaranItem } = await import('@/lib/data');
-        await updateRincianPengeluaranItem(editingCell.id, {
-          [editingCell.field === 'harga_satuan' ? 'harga_satuan' : 'qty']: parsed,
-          jumlah: updatedItem.jumlah
-        });
+      const currentItem = items.find(item => item.id === editingCell.id);
+      if (currentItem) {
+        const harga = editingCell.field === 'harga_satuan' ? parsed : currentItem.harga_satuan;
+        const qty = editingCell.field === 'qty' ? parsed : currentItem.qty;
+        const jumlah = harga * qty;
+
+        setItems(prev => prev.map(item => {
+          if (item.id !== editingCell.id) return item;
+          return { ...item, harga_satuan: harga, qty, jumlah };
+        }));
+
+        if (!editingCell.id.startsWith('ri-new-')) {
+          const { updateRincianPengeluaranItem } = await import('@/lib/data');
+          await updateRincianPengeluaranItem(editingCell.id, {
+            [editingCell.field === 'harga_satuan' ? 'harga_satuan' : 'qty']: parsed,
+            jumlah
+          });
+        }
       }
     }
     setEditingCell(null);

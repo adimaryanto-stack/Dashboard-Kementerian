@@ -1,7 +1,7 @@
-# PRD — Sistem Transparansi Anggaran Pendidikan Indonesia
+# PRD — Dashboard Kementerian
 
-**Version:** 3.1 (Mockup Client-Side Consolidated)  
-**Date:** 13 Juni 2026  
+**Version:** 1.4.0 (Mockup Client-Side Consolidated)  
+**Date:** 24 Juni 2026  
 **Status:** ✅ APPROVED FOR DEVELOPMENT  
 **Project Type:** Web-Based Spreadsheet Dashboard — Education Budget Transparency  
 **Backend Platform:** None (Pure Client-Side Mockup / Static Demo)
@@ -24,7 +24,7 @@
 ## 1. Project Overview
 
 ### 1.1 Deskripsi Aplikasi
-Sistem Transparansi Anggaran Pendidikan adalah aplikasi web berbasis **spreadsheet interface** untuk menampilkan, mengelola, dan mengaudit aliran dana pendidikan Indonesia dari tingkat nasional (APBN) hingga institusi pendidikan di seluruh daerah. Tampilannya menyerupai Excel/Google Sheets dengan semua kalkulasi angka terhubung secara real-time antar menu.
+Dashboard Kementerian adalah aplikasi web berbasis **spreadsheet interface** untuk menampilkan, mengelola, dan mengaudit aliran dana pendidikan Indonesia dari tingkat nasional (APBN) hingga institusi pendidikan di seluruh daerah. Tampilannya menyerupai Excel/Google Sheets dengan semua kalkulasi angka terhubung secara real-time antar menu.
 
 Aplikasi ini berjalan sebagai demo frontend statis (pure mockup) dengan data deterministik dalam memori untuk simulasi interaksi spreadsheet.
 
